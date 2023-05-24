@@ -16,6 +16,7 @@ hex = { version = "0.4.3", features = ["serde"] }
 thiserror = "1.0.38"
 bellperson = "0.25"
 blstrs = "0.7.0"
+byteorder = "1.4.3"
 ff = "0.13"
 generic-array = "0.14.6"
 itertools = "0.9"
