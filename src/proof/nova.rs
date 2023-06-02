@@ -13,6 +13,7 @@ use nova::{
     CompressedSNARK, ProverKey, RecursiveSNARK, VerifierKey,
 };
 use pasta_curves::{pallas, vesta};
+use rkyv::Archive;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -60,7 +61,7 @@ pub type C2 = TrivialTestCircuit<<G2 as Group>::Scalar>;
 pub type NovaPublicParams<'a, C> = nova::PublicParams<G1, G2, C1<'a, C>, C2>;
 
 /// A struct that contains public parameters for the Nova proving system.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct PublicParams<'a, C: Coprocessor<S1>> {
     pp: NovaPublicParams<'a, C>,
     pk: ProverKey<G1, G2, C1<'a, C>, C2, SS1, SS2>,

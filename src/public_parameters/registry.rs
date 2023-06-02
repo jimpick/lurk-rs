@@ -47,15 +47,15 @@ impl Registry {
         let lang_key = lang.key();
         // Sanity-check: we're about to use a lang-dependent disk cache, which should be specialized
         // for this lang/coprocessor.
-        let key = format!("public-params-rc-{rc}-coproc-{lang_key}");
+        let key = format!("public-params-rc-{rc}-coproc-{lang_key}-archived");
         // read the file if it exists, otherwise initialize
-        if let Some(pp) = disk_cache.get::<PublicParams<'static, C>>(&key) {
+        if let Some(pp) = disk_cache.get_archived::<PublicParams<'static, C>>(&key) {
             eprintln!("Using disk-cached public params for lang {}", lang_key);
             Ok(Arc::new(pp))
         } else {
             let pp = default(lang);
             disk_cache
-                .set(key, &*pp)
+                .set_archived::<_, 1024>(&key, &*pp)
                 .tap_ok(|_| eprintln!("Writing public params to disk-cache: {}", lang_key))
                 .map_err(|e| Error::CacheError(format!("Disk write error: {e}")))?;
             Ok(pp)

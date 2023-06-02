@@ -27,7 +27,7 @@ use pasta_curves::pallas::Scalar as Fr;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const REDUCTION_COUNT: usize = 10;
+const REDUCTION_COUNT: usize = 100;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct Sha256Coprocessor<F: LurkField> {
@@ -136,9 +136,9 @@ enum Sha256Coproc<F: LurkField> {
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    let num_of_64_bytes = args[1].parse::<usize>().unwrap();
-    let expect = hex::decode(args[2].parse::<String>().unwrap()).unwrap();
-    let setup_only = args[3].parse::<bool>().unwrap();
+    let num_of_64_bytes = 1; // args[1].parse::<usize>().unwrap();
+    let expect = hex::decode("f5a5fd42d16a20302798ef6ed309979b43003d2320d9f0e8ea9831a92759fb4b").unwrap();
+    let setup_only = false; // args[3].parse::<bool>().unwrap();
 
     let input_size = 64 * num_of_64_bytes;
 
