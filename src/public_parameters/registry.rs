@@ -8,7 +8,7 @@ use pasta_curves::pallas;
 use serde::{de::DeserializeOwned, Serialize};
 use tap::TapFallible;
 
-use crate::public_parameters::Error;
+use crate::{public_parameters::Error};
 use crate::{coprocessor::Coprocessor, eval::lang::Lang, proof::nova::PublicParams};
 
 use super::file_map::FileIndex;
@@ -47,7 +47,13 @@ impl Registry {
         let lang_key = lang.key();
         // Sanity-check: we're about to use a lang-dependent disk cache, which should be specialized
         // for this lang/coprocessor.
-        let key = format!("public-params-rc-{rc}-coproc-{lang_key}");
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "uncompressed")] {
+                let key = format!("public-params-rc-{rc}-coproc-{lang_key}-uncompressed");
+            } else {
+                let key = format!("public-params-rc-{rc}-coproc-{lang_key}");
+            }
+        };
         // read the file if it exists, otherwise initialize
         if let Some(pp) = disk_cache.get::<PublicParams<'static, C>>(&key) {
             eprintln!("Using disk-cached public params for lang {}", lang_key);

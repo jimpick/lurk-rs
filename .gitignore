@@ -2,3 +2,4 @@
 result*
 /scratch
 .direnv/
+.vscode/
