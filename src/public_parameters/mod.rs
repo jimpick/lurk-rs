@@ -403,13 +403,9 @@ where
     }
 
     fn read_from_path<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
-        // FIXME: due to an bug in bincode, we must first copy out 
-        // all the bytes before passing to `bincode::deserialize`.
-        // See: https://github.com/bincode-org/bincode/issues/633
-        let mut file = File::open(path)?;
-        let mut bytes = Vec::new(); 
-        file.read_to_end(&mut bytes).unwrap();
-        bincode::deserialize(&bytes).map_err(|e| {
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+        bincode::deserialize_from(reader).map_err(|e| {
             eprintln!("{}", e);
             Error::CacheError(e.to_string())
         })
