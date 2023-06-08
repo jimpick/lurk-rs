@@ -27,7 +27,7 @@ use pasta_curves::pallas::Scalar as Fr;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const REDUCTION_COUNT: usize = 10;
+const REDUCTION_COUNT: usize = 100;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct Sha256Coprocessor<F: LurkField> {
@@ -49,7 +49,7 @@ impl<F: LurkField> CoCircuit<F> for Sha256Coprocessor<F> {
         input_env: &AllocatedPtr<F>,
         input_cont: &AllocatedContPtr<F>,
     ) -> Result<(AllocatedPtr<F>, AllocatedPtr<F>, AllocatedContPtr<F>), SynthesisError> {
-        // // TODO: Maybe fix this
+        // TODO: Maybe fix this
         let false_bool = Boolean::from(AllocatedBit::alloc(cs.namespace(|| "false"), Some(false))?);
 
         let preimage = vec![false_bool; self.n * 8];

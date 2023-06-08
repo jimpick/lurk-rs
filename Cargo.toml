@@ -22,7 +22,8 @@ itertools = "0.9"
 log = "0.4.17"
 lurk-macros = { path = "lurk-macros" }
 neptune = { version = "10.0.0", features = ["arity2","arity4","arity8","arity16","pasta","bls"] }
-nova = { package = "nova-snark", version = "0.21", default-features = false }
+# nova = { package = "nova-snark", version = "0.21", default-features = false }
+nova = { package = "nova-snark", git = "https://github.com/lurk-lab/Nova.git", branch = "parallel_generate_params", default-features = false }
 once_cell = "1.17.1"
 pairing_lib = { version = "0.23", package = "pairing" }
 peekmore = "1.1.0"

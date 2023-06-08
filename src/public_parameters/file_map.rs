@@ -2,6 +2,7 @@ use std::fs::create_dir_all;
 use std::io::Error;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use crate::public_parameters::FileStore;
 
@@ -40,6 +41,13 @@ impl<K: ToString> FileIndex<K> {
 
     pub(crate) fn set<V: FileStore>(&self, key: K, data: &V) -> Result<(), Error> {
         data.write_to_path(self.key_path(&key));
+        Ok(())
+    }
+
+    pub(crate) fn set_with_timing<V: FileStore>(&self, key: K, data: &V) -> Result<(), Error> {
+        let start = Instant::now();
+        data.write_to_path(self.key_path(&key));
+        println!("set_with_timing: {:?}", start.elapsed());
         Ok(())
     }
 }
