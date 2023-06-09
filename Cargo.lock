@@ -330,9 +330,9 @@ dependencies = [
 
 [[package]]
 name = "blake3"
-version = "1.3.3"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42ae2468a89544a466886840aa467a25b766499f4f04bf7d9fcd10ecee9fccef"
+checksum = "729b71f35bd3fa1a4c86b85d32c8b9069ea7fe14f7a53cfabb65f62d4265b888"
 dependencies = [
  "arrayref",
  "arrayvec 0.7.2",
@@ -392,6 +392,7 @@ checksum = "33149fccb7f93271f0192614b884430cf274e880506bbd171cbc8918dcc95b14"
 dependencies = [
  "blst",
  "byte-slice-cast",
+ "ec-gpu",
  "ff",
  "group",
  "pairing",
@@ -560,15 +561,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-<<<<<<< HEAD
 version = "4.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "401a4694d2bf92537b6867d94de48c4842089645fdcdf6c71865b175d836e9c2"
-=======
-version = "4.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4ed2379f8603fa2b7509891660e802b88c70a79a6427a70abb5968054de2c28"
->>>>>>> uncompressed
 dependencies = [
  "clap_builder",
 ]
@@ -642,13 +637,9 @@ dependencies = [
  "anyhow",
  "assert_cmd",
  "blstrs",
-<<<<<<< HEAD
  "clap 4.3.2",
-=======
- "clap 4.3.1",
->>>>>>> uncompressed
  "lurk",
- "pasta_curves 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pasta_curves 0.5.1 (git+https://github.com/lurk-lab/pasta_curves?branch=uncompressed)",
  "pretty_env_logger",
  "serde",
 ]
@@ -838,7 +829,7 @@ checksum = "ab8bfa2e259f8ee1ce5e97824a3c55ec4404a0d772ca7fa96bf19f0752a046eb"
 dependencies = [
  "fnv",
  "ident_case",
- "proc-macro2 1.0.59",
+ "proc-macro2 1.0.60",
  "quote 1.0.28",
  "strsim",
  "syn 2.0.18",
@@ -1078,7 +1069,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "pairing",
- "pasta_curves 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pasta_curves 0.5.1 (git+https://github.com/lurk-lab/pasta_curves?branch=uncompressed)",
  "predicates 2.1.5",
  "pretty_env_logger",
  "rand",
@@ -1338,9 +1329,9 @@ dependencies = [
 
 [[package]]
 name = "iana-time-zone"
-version = "0.1.56"
+version = "0.1.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0722cd7114b7de04316e7ea5456a0bbb20e4adb46fd27a3697adb812cff0f37c"
+checksum = "2fad5b825842d2b38bd206f3e81d6957625fd7f0a361e345c30e01a0ae2dd613"
 dependencies = [
  "android_system_properties",
  "core-foundation-sys",
@@ -1489,15 +1480,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-<<<<<<< HEAD
 version = "0.2.146"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f92be4933c13fd498862a9e02a3055f8a8d9c039ce33db97306fd5a6caa7f29b"
-=======
-version = "0.2.145"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc86cde3ff845662b8f4ef6cb50ea0e20c524eb3d29ae048287e06a1b3fa6a81"
->>>>>>> uncompressed
 
 [[package]]
 name = "libm"
@@ -1541,11 +1526,7 @@ dependencies = [
  "blstrs",
  "cfg-if",
  "cid",
-<<<<<<< HEAD
  "clap 4.3.2",
-=======
- "clap 4.3.1",
->>>>>>> uncompressed
  "criterion",
  "dashmap",
  "ff",
@@ -1568,8 +1549,8 @@ dependencies = [
  "num-traits",
  "once_cell",
  "pairing",
- "pasta-msm",
- "pasta_curves 0.5.1 (git+https://github.com/winston-h-zhang/pasta_curves.git?branch=uncompressed)",
+ "pasta-msm 0.1.4 (git+https://github.com/winston-h-zhang/pasta-msm.git?branch=uncompressed)",
+ "pasta_curves 0.5.1 (git+https://github.com/lurk-lab/pasta_curves?branch=uncompressed)",
  "peekmore",
  "pprof",
  "pretty_env_logger",
@@ -1660,13 +1641,8 @@ name = "lurk-macros"
 version = "0.1.0"
 dependencies = [
  "lurk",
-<<<<<<< HEAD
- "pasta_curves",
+ "pasta_curves 0.5.1 (git+https://github.com/lurk-lab/pasta_curves?branch=uncompressed)",
  "proc-macro2 1.0.60",
-=======
- "pasta_curves 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "proc-macro2 1.0.59",
->>>>>>> uncompressed
  "quote 1.0.28",
  "syn 1.0.109",
 ]
@@ -1766,7 +1742,8 @@ dependencies = [
 [[package]]
 name = "neptune"
 version = "10.0.0"
-source = "git+https://github.com/winston-h-zhang/neptune.git?branch=uncompressed#b951513b063049d69c2122c2e92ea9f944315f19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb9a64337e6d214e2a48db5714ef18cf1e5a7bbff9043838fdf6e57ce5659335"
 dependencies = [
  "bellperson",
  "blake2s_simd 0.5.11",
@@ -1778,7 +1755,7 @@ dependencies = [
  "generic-array 0.14.7",
  "itertools 0.8.2",
  "log",
- "pasta_curves 0.5.1 (git+https://github.com/winston-h-zhang/pasta_curves.git?branch=uncompressed)",
+ "pasta_curves 0.5.1 (git+https://github.com/lurk-lab/pasta_curves?branch=uncompressed)",
  "serde",
  "trait-set",
 ]
@@ -1814,11 +1791,7 @@ checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
 [[package]]
 name = "nova-snark"
 version = "0.21.0"
-<<<<<<< HEAD
-source = "git+https://github.com/lurk-lab/Nova.git?branch=parallel_generate_params#6be1e50f26f3446d64bbd5e258c2b9004a6858a3"
-=======
-source = "git+https://github.com/winston-h-zhang/Nova.git?branch=hz/uncompressed#086113bb3c6eeae506ec93b23ffa80b9d419e9e9"
->>>>>>> uncompressed
+source = "git+https://github.com/lurk-lab/Nova.git?branch=parallel_generate_params#10d30a6f7243d49c9aee6e376c3c8f72ef28bb5e"
 dependencies = [
  "bellperson",
  "bincode",
@@ -1829,13 +1802,14 @@ dependencies = [
  "ff",
  "flate2",
  "generic-array 0.14.7",
+ "group",
  "itertools 0.9.0",
  "neptune",
  "num-bigint 0.4.3",
  "num-integer",
  "num-traits",
- "pasta-msm",
- "pasta_curves 0.5.1 (git+https://github.com/winston-h-zhang/pasta_curves.git?branch=uncompressed)",
+ "pasta-msm 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pasta_curves 0.5.1 (git+https://github.com/lurk-lab/pasta_curves?branch=uncompressed)",
  "rand_chacha",
  "rand_core",
  "rayon",
@@ -1997,6 +1971,19 @@ dependencies = [
 [[package]]
 name = "pasta-msm"
 version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e85d75eba3e7e9ee3bd11342b669185e194dadda3557934bc1000d9b87159d3"
+dependencies = [
+ "cc",
+ "pasta_curves 0.5.1 (git+https://github.com/lurk-lab/pasta_curves?branch=uncompressed)",
+ "semolina",
+ "sppark",
+ "which",
+]
+
+[[package]]
+name = "pasta-msm"
+version = "0.1.4"
 source = "git+https://github.com/winston-h-zhang/pasta-msm.git?branch=uncompressed#da184c63aef2de39ee46a16bec98041f82deb961"
 dependencies = [
  "cc",
@@ -2009,24 +1996,7 @@ dependencies = [
 [[package]]
 name = "pasta_curves"
 version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3e57598f73cc7e1b2ac63c79c517b31a0877cd7c402cdcaa311b5208de7a095"
-dependencies = [
- "blake2b_simd",
- "ff",
- "group",
- "hex",
- "lazy_static",
- "rand",
- "serde",
- "static_assertions",
- "subtle",
-]
-
-[[package]]
-name = "pasta_curves"
-version = "0.5.1"
-source = "git+https://github.com/winston-h-zhang/pasta_curves.git?branch=uncompressed#c945fa1fdb7f8434ac5a6e1a7d01934b25ee9ddb"
+source = "git+https://github.com/lurk-lab/pasta_curves?branch=uncompressed#a753a81e39f2308a8b019d9910b31e384851414c"
 dependencies = [
  "blake2b_simd",
  "ec-gpu",
@@ -2037,6 +2007,22 @@ dependencies = [
  "paste",
  "rand",
  "serde",
+ "serde_bytes",
+ "static_assertions",
+ "subtle",
+]
+
+[[package]]
+name = "pasta_curves"
+version = "0.5.1"
+source = "git+https://github.com/winston-h-zhang/pasta_curves.git?branch=uncompressed#c945fa1fdb7f8434ac5a6e1a7d01934b25ee9ddb"
+dependencies = [
+ "blake2b_simd",
+ "ff",
+ "group",
+ "lazy_static",
+ "paste",
+ "rand",
  "serde_bytes",
  "static_assertions",
  "subtle",
@@ -2586,8 +2572,6 @@ dependencies = [
  "proc-macro2 1.0.60",
  "quote 1.0.28",
  "syn 2.0.18",
-<<<<<<< HEAD
-=======
 ]
 
 [[package]]
@@ -2613,10 +2597,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edc7d5d3932fb12ce722ee5e64dd38c504efba37567f0c402f6ca728c3b8b070"
 dependencies = [
  "darling",
- "proc-macro2 1.0.59",
+ "proc-macro2 1.0.60",
  "quote 1.0.28",
  "syn 2.0.18",
->>>>>>> uncompressed
 ]
 
 [[package]]
@@ -2913,9 +2896,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.21"
+version = "0.3.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f3403384eaacbca9923fa06940178ac13e4edb725486d70e8e15881d0c836cc"
+checksum = "ea9e1b3cf1243ae005d9e74085d4d542f3125458f3a81af210d901dcd7411efd"
 dependencies = [
  "itoa",
  "serde",
@@ -3171,7 +3154,7 @@ version = "0.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e686886bc078bc1b0b600cac0147aadb815089b6e4da64016cbd754b6342700f"
 dependencies = [
- "windows-targets 0.48.0",
+ "windows-targets",
 ]
 
 [[package]]
