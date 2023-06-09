@@ -35,7 +35,6 @@ impl<K: ToString> FileIndex<K> {
     }
 
     pub(crate) fn get<V: FileStore>(&self, key: &K) -> Option<V> {
-        self.key_path(key);
         V::read_from_path(self.key_path(key)).ok()
     }
 
