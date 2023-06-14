@@ -56,9 +56,9 @@ pub struct Store<F: LurkField> {
     pub opaque_cont_ptrs: IndexSet<ZContPtr<F>>,
 
     /// Holds a mapping of `ZExprPtr` -> `Ptr` for reverse lookups
-    pub z_expr_ptr_map: CacheMap<ZExprPtr<F>, Box<Ptr<F>>>,
+    pub z_expr_ptr_map: CacheMap<ZExprPtr<F>, Ptr<F>>,
     /// Holds a mapping of `ZExprPtr` -> `ContPtr<F>` for reverse lookups
-    pub z_cont_ptr_map: CacheMap<ZContPtr<F>, Box<ContPtr<F>>>,
+    pub z_cont_ptr_map: CacheMap<ZContPtr<F>, ContPtr<F>>,
 
     /// Caches poseidon hashes
     pub poseidon_cache: PoseidonCache<F>,
@@ -70,7 +70,7 @@ pub struct Store<F: LurkField> {
 
     // improve intern_str, intern_sym performance
     //pub string_cache: CacheMap<String, Box<Ptr<F>>>,
-    pub symbol_cache: CacheMap<Symbol, Box<Ptr<F>>>,
+    pub symbol_cache: CacheMap<Symbol, Ptr<F>>,
 
     pub constants: OnceCell<NamedConstants<F>>,
 }
@@ -439,8 +439,7 @@ impl<F: LurkField> Store<F> {
             let str_ptr = self.intern_string(s);
             ptr = self.intern_symcons(str_ptr, ptr);
         }
-        self.symbol_cache
-            .insert(Symbol::Sym(path.clone()), Box::new(ptr));
+        self.symbol_cache.insert(Symbol::Sym(path.clone()), ptr);
         ptr
     }
 
@@ -461,12 +460,12 @@ impl<F: LurkField> Store<F> {
         } else {
             ptr
         };
-        self.symbol_cache.insert(sym, Box::new(ptr));
+        self.symbol_cache.insert(sym, ptr);
         ptr
     }
 
     pub fn get_sym(&self, sym: Symbol) -> Option<Ptr<F>> {
-        let ptr = self.symbol_cache.get(&sym).cloned()?;
+        let ptr = self.symbol_cache.get(&sym).map(|x| *x.value())?;
         if sym == Symbol::nil() {
             Some(Ptr {
                 tag: ExprTag::Nil,
@@ -616,11 +615,15 @@ impl<F: LurkField> Store<F> {
     }
 
     pub fn fetch_scalar(&self, scalar_ptr: &ZExprPtr<F>) -> Option<Ptr<F>> {
-        self.z_expr_ptr_map.get(scalar_ptr).copied()
+        self.z_expr_ptr_map
+            .get(scalar_ptr)
+            .map(|x| x.value().clone())
     }
 
     pub fn fetch_scalar_cont(&self, scalar_ptr: &ZContPtr<F>) -> Option<ContPtr<F>> {
-        self.z_cont_ptr_map.get(scalar_ptr).copied()
+        self.z_cont_ptr_map
+            .get(scalar_ptr)
+            .map(|x| x.value().clone())
     }
 
     pub fn fetch_maybe_sym(&self, ptr: &Ptr<F>) -> Option<Symbol> {
@@ -1130,7 +1133,7 @@ impl<F: LurkField> Store<F> {
             if let Some(z_store) = z_store {
                 z_store.borrow_mut().cont_map.insert(z_ptr, z_cont.clone());
             };
-            self.z_cont_ptr_map.insert(z_ptr, Box::new(*ptr));
+            self.z_cont_ptr_map.insert(z_ptr, *ptr);
             Ok((z_ptr, z_cont))
         }
     }
@@ -1181,7 +1184,7 @@ impl<F: LurkField> Store<F> {
                     if let Some(z_store) = z_store {
                         z_store.borrow_mut().insert_z_expr(z_ptr, z_expr.clone());
                     };
-                    store.z_expr_ptr_map.insert(*z_ptr, Box::new(ptr));
+                    store.z_expr_ptr_map.insert(*z_ptr, ptr);
                     Ok(())
                 })));
 
@@ -1495,7 +1498,7 @@ impl<F: LurkField> Store<F> {
     /// ensure that they are cached properly
     fn create_z_expr_ptr(&self, ptr: Ptr<F>, hash: F) -> ZExprPtr<F> {
         let z_ptr = ZPtr(ptr.tag, hash);
-        self.z_expr_ptr_map.insert(z_ptr, Box::new(ptr));
+        self.z_expr_ptr_map.insert(z_ptr, ptr);
         z_ptr
     }
 
@@ -1600,7 +1603,7 @@ impl<F: LurkField> Store<F> {
 
     fn create_z_cont_ptr(&self, ptr: ContPtr<F>, hash: F) -> ZContPtr<F> {
         let z_ptr = ZPtr(ptr.tag, hash);
-        self.z_cont_ptr_map.insert(z_ptr, Box::new(ptr));
+        self.z_cont_ptr_map.insert(z_ptr, ptr);
         z_ptr
     }
 

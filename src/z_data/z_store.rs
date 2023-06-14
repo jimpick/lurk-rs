@@ -40,15 +40,17 @@ impl<F: LurkField> ZStore<F> {
     pub fn to_z_store(store: &mut Store<F>) -> Self {
         store.hydrate_scalar_cache();
         let mut zstore = ZStore::new();
-        for zptr in store.z_expr_ptr_map.keys_cloned() {
-            let ptr = store.z_expr_ptr_map.get(&zptr).unwrap();
-            let zexpr = store.to_z_expr(ptr);
-            zstore.expr_map.insert(zptr, zexpr);
+        for entry in &store.z_expr_ptr_map {
+            let zptr = entry.key();
+            let ptr = store.z_expr_ptr_map.get(zptr).unwrap();
+            let zexpr = store.to_z_expr(&ptr);
+            zstore.expr_map.insert(*zptr, zexpr);
         }
-        for zptr in store.z_cont_ptr_map.keys_cloned() {
-            let ptr = store.z_cont_ptr_map.get(&zptr).unwrap();
-            let zcont = store.to_z_cont(ptr);
-            zstore.cont_map.insert(zptr, zcont);
+        for entry in &store.z_cont_ptr_map {
+            let zptr = entry.key();
+            let ptr = store.z_cont_ptr_map.get(zptr).unwrap();
+            let zcont = store.to_z_cont(&ptr);
+            zstore.cont_map.insert(*zptr, zcont);
         }
         zstore
     }
