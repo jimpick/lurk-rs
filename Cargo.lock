@@ -3,6 +3,22 @@
 version = 3
 
 [[package]]
+name = "abomonation"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56e72913c99b1f927aa7bd59a41518fdd9995f63ffc8760f211609e0241c4fb2"
+
+[[package]]
+name = "abomonation_derive"
+version = "0.5.0"
+source = "git+https://github.com/winston-h-zhang/abomonation_derive.git#b2ce264619f64b6eebd18a43f7e68318e6f5533a"
+dependencies = [
+ "proc-macro2 1.0.63",
+ "quote 1.0.29",
+ "syn 2.0.23",
+]
+
+[[package]]
 name = "addchain"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -213,15 +229,14 @@ checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 [[package]]
 name = "bellperson"
 version = "0.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93eaee4b4753554139ae52ecf0e8b8c128cbc561b32e1bfaa32f70cba8518c1f"
+source = "git+https://github.com/lurk-lab/bellperson?branch=dev#34ff7cc3492c9f1a976e705917066d10fd14b964"
 dependencies = [
  "bincode",
  "blake2s_simd 1.0.1",
  "blstrs",
  "byteorder",
  "crossbeam-channel",
- "digest 0.10.7",
+ "digest",
  "ec-gpu",
  "ec-gpu-gen",
  "ff",
@@ -321,32 +336,11 @@ dependencies = [
 
 [[package]]
 name = "block-buffer"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0940dc441f31689269e10ac70eb1002a3a1d3ad1390e030043662eb7fe4688b"
-dependencies = [
- "block-padding",
- "byte-tools",
- "byteorder",
- "generic-array 0.12.4",
-]
-
-[[package]]
-name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
 dependencies = [
- "generic-array 0.14.7",
-]
-
-[[package]]
-name = "block-padding"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa79dedbb091f449f1f39e53edf88d5dbe95f895dae6135a8d7b881fb5af73f5"
-dependencies = [
- "byte-tools",
+ "generic-array",
 ]
 
 [[package]]
@@ -365,8 +359,7 @@ dependencies = [
 [[package]]
 name = "blstrs"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33149fccb7f93271f0192614b884430cf274e880506bbd171cbc8918dcc95b14"
+source = "git+https://github.com/lurk-lab/blstrs?branch=dev#e576fed8a161c10e8af98cf79142e66ee9d66b45"
 dependencies = [
  "blst",
  "byte-slice-cast",
@@ -401,12 +394,6 @@ name = "byte-slice-cast"
 version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3ac9f8b63eca6fd385229b3675f6cc0dc5c8a5c8a54a59d4f52ffd670d87b0c"
-
-[[package]]
-name = "byte-tools"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3b5ca7a04898ad4bcd41c90c5285445ff5b791899bb1b0abdd2a2aa791211d7"
 
 [[package]]
 name = "bytecount"
@@ -610,7 +597,7 @@ dependencies = [
  "fcomm",
  "ff",
  "lurk",
- "pasta_curves",
+ "pasta_curves 0.5.1 (git+https://github.com/lurk-lab/pasta_curves?branch=dev)",
  "pretty_env_logger",
  "serde",
 ]
@@ -745,7 +732,7 @@ version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1bfb12502f3fc46cca1bb51ac28df9d618d813cdc3d2f25b9fe775a34af26bb3"
 dependencies = [
- "generic-array 0.14.7",
+ "generic-array",
  "typenum",
 ]
 
@@ -797,20 +784,11 @@ checksum = "6184e33543162437515c2e2b48714794e37845ec9851711914eec9d308f6ebe8"
 
 [[package]]
 name = "digest"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3d0c8c8752312f9713efd397ff63acb9f85585afbf179282e720e7704954dd5"
-dependencies = [
- "generic-array 0.12.4",
-]
-
-[[package]]
-name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
- "block-buffer 0.10.4",
+ "block-buffer",
  "crypto-common",
 ]
 
@@ -823,14 +801,12 @@ checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 [[package]]
 name = "ec-gpu"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd63582de2b59ea1aa48d7c1941b5d87618d95484397521b3acdfa0e1e9f5e45"
+source = "git+https://github.com/lurk-lab/ec-gpu.git?branch=dev#6c0b962c8c65b4b4013887b9ae0d3d1f2a792ccd"
 
 [[package]]
 name = "ec-gpu-gen"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "892df2aa20abec5b816e15d5d6383892ca142077708efa3067dd3ac44b75c664"
+version = "0.7.0"
+source = "git+https://github.com/lurk-lab/ec-gpu.git?branch=dev#6c0b962c8c65b4b4013887b9ae0d3d1f2a792ccd"
 dependencies = [
  "bitvec",
  "crossbeam-channel",
@@ -907,7 +883,7 @@ checksum = "16d9a9ea4c04632c16bc5c71a2fcc63d308481f7fc67eb1a1ce6315c44a426ae"
 dependencies = [
  "execute-command-macro",
  "execute-command-tokens",
- "generic-array 0.14.7",
+ "generic-array",
 ]
 
 [[package]]
@@ -965,7 +941,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "pairing",
- "pasta_curves",
+ "pasta_curves 0.5.1 (git+https://github.com/lurk-lab/pasta_curves?branch=dev)",
  "predicates 2.1.5",
  "pretty_env_logger",
  "proptest",
@@ -1083,15 +1059,6 @@ checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
 
 [[package]]
 name = "generic-array"
-version = "0.12.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffdf9f34f1447443d37393cc6c2b8313aebddcd96906caf34e54c68d8e57d7bd"
-dependencies = [
- "typenum",
-]
-
-[[package]]
-name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
@@ -1156,7 +1123,7 @@ dependencies = [
  "lazy_static",
  "num-bigint 0.4.3",
  "num-traits",
- "pasta_curves",
+ "pasta_curves 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "paste",
  "rand",
  "rand_core",
@@ -1317,6 +1284,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1408,7 +1384,7 @@ dependencies = [
  "criterion",
  "dashmap",
  "ff",
- "generic-array 0.14.7",
+ "generic-array",
  "getrandom",
  "hex",
  "home",
@@ -1427,7 +1403,7 @@ dependencies = [
  "once_cell",
  "pairing",
  "pasta-msm",
- "pasta_curves",
+ "pasta_curves 0.5.1 (git+https://github.com/lurk-lab/pasta_curves?branch=dev)",
  "peekmore",
  "pprof",
  "pretty_env_logger",
@@ -1456,7 +1432,7 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "lurk",
- "pasta_curves",
+ "pasta_curves 0.5.1 (git+https://github.com/lurk-lab/pasta_curves?branch=dev)",
  "proc-macro2 1.0.63",
  "proptest",
  "proptest-derive",
@@ -1507,9 +1483,10 @@ dependencies = [
 [[package]]
 name = "neptune"
 version = "10.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb9a64337e6d214e2a48db5714ef18cf1e5a7bbff9043838fdf6e57ce5659335"
+source = "git+https://github.com/lurk-lab/neptune?branch=dev#3248ce758bdf3c188a1e875343ee0ede22c14e5a"
 dependencies = [
+ "abomonation",
+ "abomonation_derive",
  "bellperson",
  "blake2s_simd 0.5.11",
  "blstrs",
@@ -1517,10 +1494,10 @@ dependencies = [
  "ec-gpu",
  "ec-gpu-gen",
  "ff",
- "generic-array 0.14.7",
+ "generic-array",
  "itertools 0.8.2",
  "log",
- "pasta_curves",
+ "pasta_curves 0.5.1 (git+https://github.com/lurk-lab/pasta_curves?branch=dev)",
  "serde",
  "trait-set",
 ]
@@ -1567,26 +1544,27 @@ checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
 [[package]]
 name = "nova-snark"
 version = "0.22.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90acdc02f86ed9f5f902b6eaf921774a608b953fc320bf4bba29598e51f67833"
+source = "git+https://github.com/lurk-lab/nova?branch=dev#5ce01dd38a09d537d498a79f5abe2b2549721f31"
 dependencies = [
+ "abomonation",
+ "abomonation_derive",
  "bellperson",
  "bincode",
  "bitvec",
  "byteorder",
- "digest 0.8.1",
+ "digest",
  "ff",
  "flate2",
- "generic-array 0.14.7",
+ "generic-array",
  "getrandom",
  "halo2curves",
- "itertools 0.9.0",
+ "itertools 0.11.0",
  "neptune",
  "num-bigint 0.4.3",
  "num-integer",
  "num-traits",
  "pasta-msm",
- "pasta_curves",
+ "pasta_curves 0.5.1 (git+https://github.com/lurk-lab/pasta_curves?branch=dev)",
  "rand_chacha",
  "rand_core",
  "rayon",
@@ -1682,12 +1660,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ab1bc2a289d34bd04a330323ac98a1b4bc82c9d9fcb1e66b63caa84da26b575"
 
 [[package]]
-name = "opaque-debug"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2839e79665f131bdb5782e51f2c6c9599c133c6098982a54c794358bf432529c"
-
-[[package]]
 name = "opencl-sys"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1747,11 +1719,10 @@ dependencies = [
 [[package]]
 name = "pasta-msm"
 version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e85d75eba3e7e9ee3bd11342b669185e194dadda3557934bc1000d9b87159d3"
+source = "git+https://github.com/lurk-lab/pasta-msm?branch=dev#182b971dd0f6dcc1a9a6bd5db8646bdd4600ed7e"
 dependencies = [
  "cc",
- "pasta_curves",
+ "pasta_curves 0.5.1 (git+https://github.com/lurk-lab/pasta_curves?branch=dev)",
  "semolina",
  "sppark",
  "which",
@@ -1762,6 +1733,20 @@ name = "pasta_curves"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3e57598f73cc7e1b2ac63c79c517b31a0877cd7c402cdcaa311b5208de7a095"
+dependencies = [
+ "blake2b_simd",
+ "ff",
+ "group",
+ "lazy_static",
+ "rand",
+ "static_assertions",
+ "subtle",
+]
+
+[[package]]
+name = "pasta_curves"
+version = "0.5.1"
+source = "git+https://github.com/lurk-lab/pasta_curves?branch=dev#5ce91ad8b9e2ff9c6c522e5b46720ee4847a9f9b"
 dependencies = [
  "blake2b_simd",
  "ec-gpu",
@@ -2329,20 +2314,17 @@ checksum = "479fb9d862239e610720565ca91403019f2f00410f1864c5aa7479b950a76ed8"
 dependencies = [
  "cfg-if",
  "cpufeatures",
- "digest 0.10.7",
+ "digest",
 ]
 
 [[package]]
 name = "sha3"
-version = "0.8.2"
+version = "0.10.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd26bc0e7a2e3a7c959bc494caf58b72ee0c71d67704e9520f736ca7e4853ecf"
+checksum = "75872d278a8f37ef87fa0ddbda7802605cb18344497949862c0d4dcb291eba60"
 dependencies = [
- "block-buffer 0.7.3",
- "byte-tools",
- "digest 0.8.1",
+ "digest",
  "keccak",
- "opaque-debug",
 ]
 
 [[package]]
