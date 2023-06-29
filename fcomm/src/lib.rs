@@ -1135,7 +1135,7 @@ mod test {
         let lang = Lang::new();
         let lang_rc = Arc::new(lang.clone());
         let rc = ReductionCount::One;
-        let pp = public_params(rc.count(), lang_rc.clone()).expect("public params");
+        let pp = public_params(rc.count(), true, lang_rc.clone()).expect("public params");
         let chained = true;
         let s = &mut Store::<S1>::default();
 
