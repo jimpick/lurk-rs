@@ -3,6 +3,11 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Instant;
 
+use bellperson::gadgets::boolean::{Boolean, AllocatedBit};
+use bellperson::gadgets::multipack::pack_bits;
+use bellperson::gadgets::num::AllocatedNum;
+use bellperson::gadgets::sha256::sha256;
+use itertools::enumerate;
 use lurk::circuit::gadgets::circom::sha256::sha256_circom;
 use lurk::circuit::gadgets::data::GlobalAllocations;
 use lurk::circuit::gadgets::pointer::{AllocatedContPtr, AllocatedPtr};
@@ -14,14 +19,16 @@ use lurk::ptr::Ptr;
 use lurk::public_parameters::public_params;
 use lurk::store::Store;
 use lurk::Num;
+use lurk::tag::{ExprTag, Tag};
 use lurk_macros::Coproc;
 
 use bellperson::{ConstraintSystem, SynthesisError};
 
 use pasta_curves::pallas::Scalar as Fr;
 use serde::{Deserialize, Serialize};
+use sha2::Sha256;
 
-const REDUCTION_COUNT: usize = 10;
+const REDUCTION_COUNT: usize = 1;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct CircomSha256Coprocessor<F: LurkField> {
@@ -45,7 +52,7 @@ impl<F: LurkField> CoCircuit<F> for CircomSha256Coprocessor<F> {
     ) -> Result<(AllocatedPtr<F>, AllocatedPtr<F>, AllocatedContPtr<F>), SynthesisError> {
 
         let mut root = current_dir().unwrap();
-        root.pop();
+        println!("root is: {root:?}");
         let output = sha256_circom(
             &mut cs.namespace(|| "sha256_circom"),
             F::from(0),
@@ -101,9 +108,86 @@ impl<F: LurkField> CircomSha256Coprocessor<F> {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct Sha256Coprocessor<F: LurkField> {
+    n: usize,
+    pub(crate) _p: PhantomData<F>,
+}
+
+impl<F: LurkField> CoCircuit<F> for Sha256Coprocessor<F> {
+    fn arity(&self) -> usize {
+        0
+    }
+
+    fn synthesize<CS: ConstraintSystem<F>>(
+        &self,
+        cs: &mut CS,
+        g: &GlobalAllocations<F>,
+        store: &Store<F>,
+        _input_exprs: &[AllocatedPtr<F>],
+        input_env: &AllocatedPtr<F>,
+        input_cont: &AllocatedContPtr<F>,
+    ) -> Result<(AllocatedPtr<F>, AllocatedPtr<F>, AllocatedContPtr<F>), SynthesisError> {
+        // // TODO: Maybe fix this
+        let false_bool = Boolean::from(AllocatedBit::alloc(cs.namespace(|| "false"), Some(false))?);
+
+        let preimage = vec![false_bool; self.n * 8];
+
+        let mut bits = sha256(cs.namespace(|| "SHAhash"), &preimage)?;
+
+        bits.reverse();
+
+        let nums: Vec<AllocatedNum<_>> = (0..2)
+            .map(|i| {
+                pack_bits(
+                    cs.namespace(|| format!("num{i}")),
+                    &bits[(128 * i)..(128 * (i + 1))],
+                )
+                .unwrap()
+            })
+            .collect();
+
+        let result_ptr = enumerate(nums).try_fold(g.nil_ptr.clone(), |acc, (i, num)| {
+            let ptr = AllocatedPtr::alloc_tag(
+                &mut cs.namespace(|| format!("limb_value_{i}")),
+                ExprTag::Num.to_field(),
+                num,
+            )?;
+            AllocatedPtr::construct_cons(cs.namespace(|| format!("limb_{i}")), g, store, &ptr, &acc)
+        })?;
+
+        Ok((result_ptr, input_env.clone(), input_cont.clone()))
+    }
+}
+
+impl<F: LurkField> Coprocessor<F> for Sha256Coprocessor<F> {
+    fn eval_arity(&self) -> usize {
+        0
+    }
+
+    fn simple_evaluate(&self, s: &mut Store<F>, _args: &[Ptr<F>]) -> Ptr<F> {
+        let expected = Num::Scalar(F::from_str_vartime("55165702627807990590530466439275329993482327026534454077267643456").unwrap());
+        s.intern_num(expected)
+    }
+
+    fn has_circuit(&self) -> bool {
+        true
+    }
+}
+
+impl<F: LurkField> Sha256Coprocessor<F> {
+    pub(crate) fn new(n: usize) -> Self {
+        Self {
+            n,
+            _p: Default::default(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Coproc, Serialize, Deserialize)]
-enum CircomSha256Coproc<F: LurkField> {
-    SC(CircomSha256Coprocessor<F>),
+enum Sha256Coproc<F: LurkField> {
+    SC1(Sha256Coprocessor<F>),
+    SC2(CircomSha256Coprocessor<F>),
 }
 
 /// Run the example in this file with
@@ -112,9 +196,9 @@ fn main() {
 
     let store = &mut Store::<Fr>::new();
     let sym_str = format!(".circom_sha256_{}", 2); // two inputs
-    let lang = Lang::<Fr, CircomSha256Coproc<Fr>>::new_with_bindings(
+    let lang = Lang::<Fr, Sha256Coproc<Fr>>::new_with_bindings(
         store,
-        vec![(sym_str.clone(), CircomSha256Coprocessor::new(0).into())],
+        vec![(sym_str.clone(), Sha256Coprocessor::new(64).into())],
     );
 
     let coproc_expr = format!("{}", sym_str);
@@ -123,13 +207,13 @@ fn main() {
     let expr = format!("({coproc_expr})");
     let ptr = store.read(&expr).unwrap();
 
-    let nova_prover = NovaProver::<Fr, CircomSha256Coproc<Fr>>::new(REDUCTION_COUNT, lang.clone());
+    let nova_prover = NovaProver::<Fr, Sha256Coproc<Fr>>::new(REDUCTION_COUNT, lang.clone());
     let lang_rc = Arc::new(lang);
 
     println!("Setting up public parameters...");
 
     let pp_start = Instant::now();
-    let pp = public_params::<CircomSha256Coproc<Fr>>(REDUCTION_COUNT, lang_rc.clone()).unwrap();
+    let pp = public_params::<Sha256Coproc<Fr>>(REDUCTION_COUNT, lang_rc.clone()).unwrap();
     let pp_end = pp_start.elapsed();
 
     println!("Public parameters took {:?}", pp_end);

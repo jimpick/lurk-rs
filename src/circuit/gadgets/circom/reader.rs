@@ -143,7 +143,7 @@ fn load_r1cs_from_bin_file<Fr: PrimeField>(filename: &Path) -> R1CS<Fr> {
     let reader = OpenOptions::new()
         .read(true)
         .open(filename)
-        .expect("unable to open.");
+        .expect(&format!("unable to open {filename:?}"));
     load_r1cs_from_bin(BufReader::new(reader))
 }
 
