@@ -5,6 +5,7 @@ use std::{fs::read_to_string, process};
 
 use anyhow::{bail, Context, Result};
 
+use lurk::eval::Frame;
 use rustyline::{
     error::ReadlineError,
     history::DefaultHistory,
@@ -14,14 +15,10 @@ use rustyline::{
 use rustyline_derive::{Completer, Helper, Highlighter, Hinter};
 
 use lurk::{
-    eval::{
-        lang::{Coproc, Lang},
-        Evaluable, Evaluator, Witness,
-    },
+    eval::{lang::Lang, Evaluator, Witness},
     field::LurkField,
     parser,
     ptr::Ptr,
-    public_parameters::{Claim, LurkCont, LurkPtr, PtrEvaluation},
     store::Store,
     tag::{ContTag, ExprTag},
     writer::Write,
@@ -31,8 +28,6 @@ use lurk::{
 
 #[cfg(not(target_arch = "wasm32"))]
 use crate::cli::paths::repl_history;
-
-use super::prove_and_verify::prove_claim;
 
 #[derive(Completer, Helper, Highlighter, Hinter)]
 struct InputValidator {
@@ -56,7 +51,7 @@ pub struct Repl<F: LurkField, C: Coprocessor<F>> {
     env: Ptr<F>,
     limit: usize,
     lang: Arc<Lang<F, C>>,
-    last_claim: Option<Claim<F>>,
+    last_frames: Option<Vec<Frame<IO<F>, Witness<F>, C>>>,
     rc: usize,
     backend: Backend,
 }
@@ -97,23 +92,17 @@ impl<F: LurkField + serde::Serialize + for<'de> serde::Deserialize<'de>, C: Copr
             store,
             env,
             limit,
-            lang: Arc::new(Lang::<F, C>::new()),
-            last_claim: None,
+            lang: Arc::new(Lang::new()),
+            last_frames: None,
             rc,
             backend,
         })
     }
 
-    pub fn prove_last_claim(&mut self) -> Result<()> {
-        match &self.last_claim {
-            Some(claim) => {
-                // TODO
-                let _proof = prove_claim(claim);
-                Ok(())
-            }
-            None => {
-                bail!("No claim to prove");
-            }
+    pub fn prove_last_frames(&mut self) -> Result<()> {
+        match &self.last_frames {
+            None => bail!("No claim to prove"),
+            Some(frames) => Ok(()),
         }
     }
 
@@ -302,9 +291,9 @@ impl<F: LurkField + serde::Serialize + for<'de> serde::Deserialize<'de>, C: Copr
             }
             "prove" => {
                 if !args.is_nil() {
-                    self.eval_expr_and_set_last_claim(self.peek1(cmd, args)?)?;
+                    self.eval_expr_and_set_last_frames(self.peek1(cmd, args)?)?;
                 }
-                self.prove_last_claim()?;
+                self.prove_last_frames()?;
             }
             "verify" => {
                 todo!()
@@ -328,35 +317,27 @@ impl<F: LurkField + serde::Serialize + for<'de> serde::Deserialize<'de>, C: Copr
         Ok(())
     }
 
-    fn eval_expr_and_set_last_claim(&mut self, expr_ptr: Ptr<F>) -> Result<(IO<F>, usize)> {
-        self.eval_expr(expr_ptr).map(|(output, iterations, _)| {
-            if matches!(
-                output.cont.tag,
-                ContTag::Outermost | ContTag::Terminal | ContTag::Error
-            ) {
-                let cont = self.store.get_cont_outermost();
+    fn eval_expr_and_set_last_frames(&mut self, expr_ptr: Ptr<F>) -> Result<(IO<F>, usize)> {
+        let frames = Evaluator::new(expr_ptr, self.env, &mut self.store, self.limit, &self.lang)
+            .get_frames()?;
 
-                let claim = Claim::PtrEvaluation::<F>(PtrEvaluation {
-                    expr: LurkPtr::from_ptr(&mut self.store, &expr_ptr),
-                    env: LurkPtr::from_ptr(&mut self.store, &self.env),
-                    cont: LurkCont::from_cont_ptr(&mut self.store, &cont),
-                    expr_out: LurkPtr::from_ptr(&mut self.store, &output.expr),
-                    env_out: LurkPtr::from_ptr(&mut self.store, &output.env),
-                    cont_out: LurkCont::from_cont_ptr(&mut self.store, &output.cont),
-                    status: <lurk::eval::IO<F> as Evaluable<F, Witness<F>, Coproc<F>>>::status(
-                        &output,
-                    ),
-                    iterations: Some(pad_iterations(iterations, self.rc)),
-                });
+        let last_idx = frames.len() - 1;
+        let last_frame = &frames[last_idx];
+        let last_output = last_frame.output;
 
-                self.last_claim = Some(claim);
-            }
-            (output, iterations)
-        })
+        let mut iterations = last_idx;
+
+        if last_frame.is_complete() {
+            self.last_frames = Some(frames)
+        } else {
+            iterations += 1;
+        }
+
+        Ok((last_output, iterations))
     }
 
     fn handle_non_meta(&mut self, expr_ptr: Ptr<F>) -> Result<()> {
-        self.eval_expr_and_set_last_claim(expr_ptr)
+        self.eval_expr_and_set_last_frames(expr_ptr)
             .map(|(output, iterations)| {
                 let prefix = if iterations != 1 {
                     format!("[{iterations} iterations] => ")
@@ -369,7 +350,7 @@ impl<F: LurkField + serde::Serialize + for<'de> serde::Deserialize<'de>, C: Copr
                         output.expr.fmt_to_string(&self.store)
                     }
                     ContTag::Error => "ERROR!".into(),
-                    _ => format!("Computation incomplete after limit: {}", self.limit),
+                    _ => "Computation incomplete (limit reached)".into(),
                 };
 
                 println!("{}{}", prefix, suffix);

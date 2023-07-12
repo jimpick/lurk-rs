@@ -1,5 +1,4 @@
 mod paths;
-mod prove_and_verify;
 mod repl;
 
 use std::collections::HashMap;
@@ -18,7 +17,6 @@ use pasta_curves::{pallas, vesta};
 
 use clap::{Args, Parser, Subcommand};
 
-use self::prove_and_verify::verify_proof;
 use self::repl::{Backend, Repl};
 
 const DEFAULT_LIMIT: usize = 100_000_000;
@@ -305,7 +303,7 @@ impl LoadCli {
                 let mut repl = new_repl!(self, $limit, $rc, $field, $backend);
                 repl.load_file(&self.lurk_file)?;
                 if self.prove {
-                    repl.prove_last_claim()?;
+                    repl.prove_last_frames()?;
                 }
                 Ok(())
             }};
@@ -348,7 +346,7 @@ pub fn parse_and_run() -> Result<()> {
         match Cli::parse().command {
             Command::Repl(repl_args) => repl_args.into_cli().run(),
             Command::Load(load_args) => load_args.into_cli().run(),
-            Command::Verify(verify_args) => verify_proof(&verify_args.proof_file),
+            Command::Verify(_verify_args) => todo!(),
         }
     }
 }
