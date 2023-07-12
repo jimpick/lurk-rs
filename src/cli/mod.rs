@@ -8,12 +8,11 @@ use std::path::PathBuf;
 use anyhow::{bail, Context, Result};
 
 use config::{Config, Environment, File};
-use lurk::eval::lang::Coproc;
 use lurk::field::{LanguageField, LurkField};
 use lurk::store::Store;
 use lurk::z_data::{from_z_data, ZData};
 use lurk::z_store::ZStore;
-use pasta_curves::{pallas, vesta};
+use pasta_curves::pallas;
 
 use clap::{Args, Parser, Subcommand};
 
@@ -262,7 +261,7 @@ macro_rules! new_repl {
     ( $cli: expr, $limit: expr, $rc: expr, $field: path, $backend: expr ) => {{
         let mut store = get_store(&$cli.zstore).with_context(|| "reading store from file")?;
         let env = store.nil();
-        Repl::<$field, Coproc<$field>>::new(store, env, $limit, $rc, $backend)?
+        Repl::<$field>::new(store, env, $limit, $rc, $backend)?
     }};
 }
 
@@ -290,8 +289,10 @@ impl ReplCli {
         )?;
         match field {
             LanguageField::Pallas => repl!(limit, rc, pallas::Scalar, backend),
-            LanguageField::Vesta => repl!(limit, rc, vesta::Scalar, backend),
-            LanguageField::BLS12_381 => repl!(limit, rc, blstrs::Scalar, backend),
+            // LanguageField::Vesta => repl!(limit, rc, vesta::Scalar, backend),
+            // LanguageField::BLS12_381 => repl!(limit, rc, blstrs::Scalar, backend),
+            LanguageField::Vesta => todo!(),
+            LanguageField::BLS12_381 => todo!(),
         }
     }
 }
@@ -321,8 +322,10 @@ impl LoadCli {
         )?;
         match field {
             LanguageField::Pallas => load!(limit, rc, pallas::Scalar, backend),
-            LanguageField::Vesta => load!(limit, rc, vesta::Scalar, backend),
-            LanguageField::BLS12_381 => load!(limit, rc, blstrs::Scalar, backend),
+            // LanguageField::Vesta => load!(limit, rc, vesta::Scalar, backend),
+            // LanguageField::BLS12_381 => load!(limit, rc, blstrs::Scalar, backend),
+            LanguageField::Vesta => todo!(),
+            LanguageField::BLS12_381 => todo!(),
         }
     }
 }

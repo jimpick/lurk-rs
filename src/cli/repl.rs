@@ -5,7 +5,6 @@ use std::{fs::read_to_string, process};
 
 use anyhow::{bail, Context, Result};
 
-use lurk::eval::Frame;
 use rustyline::{
     error::ReadlineError,
     history::DefaultHistory,
@@ -15,15 +14,19 @@ use rustyline::{
 use rustyline_derive::{Completer, Helper, Highlighter, Hinter};
 
 use lurk::{
-    eval::{lang::Lang, Evaluator, Witness},
+    eval::{
+        lang::{Coproc, Lang},
+        Evaluator, Frame, Witness, IO,
+    },
     field::LurkField,
     parser,
+    proof::{nova::NovaProver, Prover},
     ptr::Ptr,
+    public_parameters::public_params,
     store::Store,
     tag::{ContTag, ExprTag},
     writer::Write,
     Num, UInt,
-    {coprocessor::Coprocessor, eval::IO},
 };
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -45,13 +48,15 @@ pub enum Backend {
     Groth16,
 }
 
+type FrameVec<F> = Vec<Frame<IO<F>, Witness<F>, Coproc<F>>>;
+
 #[allow(dead_code)]
-pub struct Repl<F: LurkField, C: Coprocessor<F>> {
+pub struct Repl<F: LurkField> {
     store: Store<F>,
     env: Ptr<F>,
     limit: usize,
-    lang: Arc<Lang<F, C>>,
-    last_frames: Option<Vec<Frame<IO<F>, Witness<F>, C>>>,
+    lang: Arc<Lang<F, Coproc<F>>>,
+    last_frames: Option<FrameVec<F>>,
     rc: usize,
     backend: Backend,
 }
@@ -76,16 +81,16 @@ fn pad_iterations(iterations: usize, rc: usize) -> usize {
     }
 }
 
-impl<F: LurkField + serde::Serialize + for<'de> serde::Deserialize<'de>, C: Coprocessor<F>>
-    Repl<F, C>
-{
+type F = pasta_curves::pallas::Scalar;
+
+impl Repl<F> {
     pub fn new(
         store: Store<F>,
         env: Ptr<F>,
         limit: usize,
         rc: usize,
         backend: Backend,
-    ) -> Result<Repl<F, C>> {
+    ) -> Result<Repl<F>> {
         check_non_zero("limit", limit)?;
         check_non_zero("rc", rc)?;
         Ok(Repl {
@@ -102,7 +107,21 @@ impl<F: LurkField + serde::Serialize + for<'de> serde::Deserialize<'de>, C: Copr
     pub fn prove_last_frames(&mut self) -> Result<()> {
         match &self.last_frames {
             None => bail!("No claim to prove"),
-            Some(frames) => Ok(()),
+            Some(frames) => {
+                // TODO: case on self.backend
+                let mut frames = frames.clone();
+                let n_frames = frames.len();
+                for _ in 0..pad_iterations(n_frames, self.rc) - n_frames {
+                    frames.push(frames[frames.len() - 1].clone())
+                }
+                let prover = NovaProver::new(self.rc, (*self.lang).clone());
+                let pp = public_params(self.rc, self.lang.clone())?;
+                self.store.hydrate_scalar_cache();
+                let (proof, z0, zi, num_steps) =
+                    prover.prove(&pp, frames, &mut self.store, self.lang.clone())?;
+                assert!(proof.verify(&pp, num_steps, z0, &zi)?);
+                Ok(())
+            }
         }
     }
 
