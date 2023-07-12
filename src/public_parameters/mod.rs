@@ -76,7 +76,7 @@ pub fn committed_expression_store() -> CommittedExpressionMap {
     FileMap::<Commitment<S1>, CommittedExpression<S1>>::new("committed_expressions").unwrap()
 }
 
-pub fn public_params<C: Coprocessor<S1> + Serialize + DeserializeOwned + 'static>(
+pub fn public_params<C: Coprocessor<S1> + 'static>(
     rc: usize,
     lang: Arc<Lang<S1, C>>,
 ) -> Result<Arc<PublicParams<'static, C>>, Error> {

@@ -1,0 +1,426 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'fcomm'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=fcomm",
+                    "--package=fcomm"
+                ],
+                "filter": {
+                    "name": "fcomm",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'fcomm'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=fcomm",
+                    "--package=fcomm"
+                ],
+                "filter": {
+                    "name": "fcomm",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'makefile_tests'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=makefile_tests",
+                    "--package=fcomm"
+                ],
+                "filter": {
+                    "name": "makefile_tests",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'proof_tests'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=proof_tests",
+                    "--package=fcomm"
+                ],
+                "filter": {
+                    "name": "proof_tests",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'lurk'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=lurk"
+                ],
+                "filter": {
+                    "name": "lurk",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'lurkrs'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=lurkrs",
+                    "--package=lurk"
+                ],
+                "filter": {
+                    "name": "lurkrs",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'lurkrs'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=lurkrs",
+                    "--package=lurk"
+                ],
+                "filter": {
+                    "name": "lurkrs",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'sha256'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=sha256",
+                    "--package=lurk"
+                ],
+                "filter": {
+                    "name": "sha256",
+                    "kind": "example"
+                }
+            },
+            "args": [
+                "1",
+                "f5a5fd42d16a20302798ef6ed309979b43003d2320d9f0e8ea9831a92759fb4b",
+                "false"
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'sha256'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=sha256",
+                    "--package=lurk"
+                ],
+                "filter": {
+                    "name": "sha256",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'lurkrs-smoke-test'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=lurkrs-smoke-test",
+                    "--package=lurk"
+                ],
+                "filter": {
+                    "name": "lurkrs-smoke-test",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'light-data-exprs'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=light-data-exprs",
+                    "--package=lurk"
+                ],
+                "filter": {
+                    "name": "light-data-exprs",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'light-data-store'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=light-data-store",
+                    "--package=lurk"
+                ],
+                "filter": {
+                    "name": "light-data-store",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'lurk-tests'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=lurk-tests",
+                    "--package=lurk"
+                ],
+                "filter": {
+                    "name": "lurk-tests",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug benchmark 'end2end'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bench=end2end",
+                    "--package=lurk"
+                ],
+                "filter": {
+                    "name": "end2end",
+                    "kind": "bench"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug benchmark 'fibonacci'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bench=fibonacci",
+                    "--package=lurk"
+                ],
+                "filter": {
+                    "name": "fibonacci",
+                    "kind": "bench"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug benchmark 'synthesis'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bench=synthesis",
+                    "--package=lurk"
+                ],
+                "filter": {
+                    "name": "synthesis",
+                    "kind": "bench"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug benchmark 'public_params'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bench=public_params",
+                    "--package=lurk"
+                ],
+                "filter": {
+                    "name": "public_params",
+                    "kind": "bench"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'lurk_macro_test'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=lurk_macro_test",
+                    "--package=lurk-macros"
+                ],
+                "filter": {
+                    "name": "lurk_macro_test",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'clutch'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=clutch"
+                ],
+                "filter": {
+                    "name": "clutch",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'clutch'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=clutch",
+                    "--package=clutch"
+                ],
+                "filter": {
+                    "name": "clutch",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'clutch'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=clutch",
+                    "--package=clutch"
+                ],
+                "filter": {
+                    "name": "clutch",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'clutch-smoke-test'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=clutch-smoke-test",
+                    "--package=clutch"
+                ],
+                "filter": {
+                    "name": "clutch-smoke-test",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

@@ -1,5 +1,6 @@
 use std::env::current_dir;
 use std::marker::PhantomData;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -24,16 +25,24 @@ use lurk_macros::Coproc;
 
 use bellperson::{ConstraintSystem, SynthesisError};
 
+use nova_scotia::r1cs::CircomConfig;
 use pasta_curves::pallas::Scalar as Fr;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 
 const REDUCTION_COUNT: usize = 1;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub(crate) struct CircomSha256Coprocessor<F: LurkField> {
     n: usize,
-    pub(crate) _p: PhantomData<F>,
+    root: PathBuf,
+    circom_config: CircomConfig<F>,
+}
+
+impl<F: LurkField> Clone for CircomSha256Coprocessor<F> {
+    fn clone(&self) -> Self {
+        CircomSha256Coprocessor::new(self.n, self.root.clone())
+    }
 }
 
 impl<F: LurkField> CoCircuit<F> for CircomSha256Coprocessor<F> {
@@ -51,13 +60,11 @@ impl<F: LurkField> CoCircuit<F> for CircomSha256Coprocessor<F> {
         input_cont: &AllocatedContPtr<F>,
     ) -> Result<(AllocatedPtr<F>, AllocatedPtr<F>, AllocatedContPtr<F>), SynthesisError> {
 
-        let mut root = current_dir().unwrap();
-        println!("root is: {root:?}");
         let output = sha256_circom(
             &mut cs.namespace(|| "sha256_circom"),
             F::from(0),
             F::from(0),
-            root,
+            &mut self.circom_config,
         )?;
 
 
@@ -100,15 +107,23 @@ impl<F: LurkField> Coprocessor<F> for CircomSha256Coprocessor<F> {
 }
 
 impl<F: LurkField> CircomSha256Coprocessor<F> {
-    pub(crate) fn new(n: usize) -> Self {
+    pub(crate) fn new(n: usize, root: PathBuf) -> Self {
+        let mut wtns = root.clone();
+        wtns.push("main_js");
+        wtns.push("main");
+        wtns.set_extension("wasm");
+        let mut r1cs = root.clone();
+        r1cs.push("main");
+        r1cs.set_extension("r1cs");
         Self {
             n,
-            _p: Default::default(),
+            root,
+            circom_config: CircomConfig::new(wtns, r1cs).unwrap(),
         }
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub(crate) struct Sha256Coprocessor<F: LurkField> {
     n: usize,
     pub(crate) _p: PhantomData<F>,
@@ -184,7 +199,7 @@ impl<F: LurkField> Sha256Coprocessor<F> {
     }
 }
 
-#[derive(Clone, Debug, Coproc, Serialize, Deserialize)]
+#[derive(Clone, Debug, Coproc)]
 enum Sha256Coproc<F: LurkField> {
     SC1(Sha256Coprocessor<F>),
     SC2(CircomSha256Coprocessor<F>),
