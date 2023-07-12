@@ -16,12 +16,18 @@ use pasta_curves::{pallas, vesta};
 
 use clap::{Args, Parser, Subcommand};
 
-// use self::prove_and_verify::verify_proof;
+use self::prove_and_verify::verify_proof;
 use self::repl::Repl;
 
-const DEFAULT_FIELD: LanguageField = LanguageField::Pallas;
 const DEFAULT_LIMIT: usize = 100_000_000;
 const DEFAULT_RC: usize = 10;
+const DEFAULT_FIELD: LanguageField = LanguageField::Pallas;
+// const DEFAULT_BACKEND: Backend = Backend::Nova;
+
+// enum Backend {
+//     Nova,
+//     Groth16,
+// }
 
 #[derive(Parser, Debug)]
 #[clap(version)]
@@ -36,8 +42,8 @@ enum Command {
     Load(LoadArgs),
     /// Enters Lurk's REPL environment ("repl" can be elided)
     Repl(ReplArgs),
-    // /// Verifies a Lurk proof
-    // Verify(VerifyArgs),
+    /// Verifies a Lurk proof
+    Verify(VerifyArgs),
 }
 
 #[derive(Args, Debug)]
@@ -53,13 +59,14 @@ struct LoadArgs {
     /// Maximum number of iterations allowed (defaults to 100_000_000)
     #[clap(long, value_parser)]
     limit: Option<usize>,
-    // /// Reduction count used for proofs (defaults to 10)
-    // #[clap(long, value_parser)]
-    // rc: Option<usize>,
 
-    // /// Flag to prove the last evaluation
-    // #[arg(long)]
-    // prove: bool,
+    /// Reduction count used for proofs (defaults to 10)
+    #[clap(long, value_parser)]
+    rc: Option<usize>,
+
+    /// Flag to prove the last evaluation
+    #[arg(long)]
+    prove: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -72,11 +79,12 @@ struct LoadCli {
 
     #[clap(long, value_parser)]
     limit: Option<usize>,
-    // #[arg(long)]
-    // prove: bool,
 
-    // #[clap(long, value_parser)]
-    // rc: Option<usize>,
+    #[arg(long)]
+    prove: bool,
+
+    #[clap(long, value_parser)]
+    rc: Option<usize>,
 }
 
 impl LoadArgs {
@@ -85,8 +93,8 @@ impl LoadArgs {
             lurk_file: self.lurk_file,
             zstore: self.zstore,
             limit: self.limit,
-            // prove: self.prove,
-            // rc: self.rc,
+            prove: self.prove,
+            rc: self.rc,
         }
     }
 }
@@ -104,9 +112,10 @@ struct ReplArgs {
     /// Maximum number of iterations allowed (defaults to 100_000_000)
     #[clap(long, value_parser)]
     limit: Option<usize>,
-    // /// Reduction count used for proofs (defaults to 10)
-    // #[clap(long, value_parser)]
-    // rc: Option<usize>,
+
+    /// Reduction count used for proofs (defaults to 10)
+    #[clap(long, value_parser)]
+    rc: Option<usize>,
 }
 
 #[derive(Parser, Debug)]
@@ -119,8 +128,9 @@ struct ReplCli {
 
     #[clap(long, value_parser)]
     limit: Option<usize>,
-    // #[clap(long, value_parser)]
-    // rc: Option<usize>,
+
+    #[clap(long, value_parser)]
+    rc: Option<usize>,
 }
 
 impl ReplArgs {
@@ -129,7 +139,7 @@ impl ReplArgs {
             load: self.load,
             zstore: self.zstore,
             limit: self.limit,
-            // rc: self.rc,
+            rc: self.rc,
         }
     }
 }
@@ -164,11 +174,10 @@ fn get_store<F: LurkField + for<'a> serde::de::Deserialize<'a>>(
 macro_rules! new_repl {
     ( $cli: expr, $field: path ) => {{
         let limit = $cli.limit.unwrap_or(DEFAULT_LIMIT);
-        // let rc = $cli.rc.unwrap_or(DEFAULT_RC);
+        let rc = $cli.rc.unwrap_or(DEFAULT_RC);
         let mut store = get_store(&$cli.zstore).with_context(|| "reading store from file")?;
         let env = store.nil();
-        // Repl::<$field, Coproc<$field>>::new(store, env, limit, rc)?
-        Repl::<$field, Coproc<$field>>::new(store, env, limit, DEFAULT_RC)?
+        Repl::<$field, Coproc<$field>>::new(store, env, limit, rc)?
     }};
 }
 
@@ -197,9 +206,9 @@ impl LoadCli {
             ( $field: path ) => {{
                 let mut repl = new_repl!(self, $field);
                 repl.load_file(&self.lurk_file)?;
-                // if self.prove {
-                //     repl.prove_last_claim()?;
-                // }
+                if self.prove {
+                    repl.prove_last_claim()?;
+                }
                 Ok(())
             }};
         }
@@ -211,11 +220,11 @@ impl LoadCli {
     }
 }
 
-// #[derive(Args, Debug)]
-// struct VerifyArgs {
-//     #[clap(value_parser)]
-//     proof_file: PathBuf,
-// }
+#[derive(Args, Debug)]
+struct VerifyArgs {
+    #[clap(value_parser)]
+    proof_file: PathBuf,
+}
 
 /// Parses CLI arguments and continues the program flow accordingly
 pub fn parse_and_run() -> Result<()> {
@@ -229,7 +238,7 @@ pub fn parse_and_run() -> Result<()> {
         match Cli::parse().command {
             Command::Repl(repl_args) => repl_args.into_cli().run(),
             Command::Load(load_args) => load_args.into_cli().run(),
-            // Command::Verify(verify_args) => verify_proof(&verify_args.proof_file),
+            Command::Verify(verify_args) => verify_proof(&verify_args.proof_file),
         }
     }
 }

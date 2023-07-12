@@ -10,7 +10,6 @@ pub fn prove_claim<F: LurkField>(_claim: &Claim<F>) -> Result<Proof<F>> {
     todo!()
 }
 
-#[allow(dead_code)]
 pub fn verify_proof(_proof_file: &Path) -> Result<()> {
     // TODO: mimic clutch
     todo!()
