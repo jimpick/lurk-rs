@@ -45,6 +45,12 @@ impl Validator for InputValidator {
     }
 }
 
+pub enum Backend {
+    Nova,
+    Groth16,
+}
+
+#[allow(dead_code)]
 pub struct Repl<F: LurkField, C: Coprocessor<F>> {
     store: Store<F>,
     env: Ptr<F>,
@@ -52,6 +58,7 @@ pub struct Repl<F: LurkField, C: Coprocessor<F>> {
     lang: Arc<Lang<F, C>>,
     last_claim: Option<Claim<F>>,
     rc: usize,
+    backend: Backend,
 }
 
 fn check_non_zero(name: &str, x: usize) -> Result<()> {
@@ -77,7 +84,13 @@ fn pad_iterations(iterations: usize, rc: usize) -> usize {
 impl<F: LurkField + serde::Serialize + for<'de> serde::Deserialize<'de>, C: Coprocessor<F>>
     Repl<F, C>
 {
-    pub fn new(store: Store<F>, env: Ptr<F>, limit: usize, rc: usize) -> Result<Repl<F, C>> {
+    pub fn new(
+        store: Store<F>,
+        env: Ptr<F>,
+        limit: usize,
+        rc: usize,
+        backend: Backend,
+    ) -> Result<Repl<F, C>> {
         check_non_zero("limit", limit)?;
         check_non_zero("rc", rc)?;
         Ok(Repl {
@@ -87,6 +100,7 @@ impl<F: LurkField + serde::Serialize + for<'de> serde::Deserialize<'de>, C: Copr
             lang: Arc::new(Lang::<F, C>::new()),
             last_claim: None,
             rc,
+            backend,
         })
     }
 

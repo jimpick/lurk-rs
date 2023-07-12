@@ -2,11 +2,13 @@ mod paths;
 mod prove_and_verify;
 mod repl;
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
 
+use config::{Config, Environment, File};
 use lurk::eval::lang::Coproc;
 use lurk::field::{LanguageField, LurkField};
 use lurk::store::Store;
@@ -17,17 +19,12 @@ use pasta_curves::{pallas, vesta};
 use clap::{Args, Parser, Subcommand};
 
 use self::prove_and_verify::verify_proof;
-use self::repl::Repl;
+use self::repl::{Backend, Repl};
 
 const DEFAULT_LIMIT: usize = 100_000_000;
 const DEFAULT_RC: usize = 10;
 const DEFAULT_FIELD: LanguageField = LanguageField::Pallas;
-// const DEFAULT_BACKEND: Backend = Backend::Nova;
-
-// enum Backend {
-//     Nova,
-//     Groth16,
-// }
+const DEFAULT_BACKEND: Backend = Backend::Nova;
 
 #[derive(Parser, Debug)]
 #[clap(version)]
@@ -56,6 +53,14 @@ struct LoadArgs {
     #[clap(long, value_parser)]
     zstore: Option<PathBuf>,
 
+    /// Flag to prove the last evaluation
+    #[arg(long)]
+    prove: bool,
+
+    /// Config file (higher precedence than env vars and lower than CLI args)
+    #[clap(long, value_parser)]
+    config: Option<PathBuf>,
+
     /// Maximum number of iterations allowed (defaults to 100_000_000)
     #[clap(long, value_parser)]
     limit: Option<usize>,
@@ -64,9 +69,13 @@ struct LoadArgs {
     #[clap(long, value_parser)]
     rc: Option<usize>,
 
-    /// Flag to prove the last evaluation
-    #[arg(long)]
-    prove: bool,
+    /// Arithmetic field (defaults to "pallas")
+    #[clap(long, value_parser)]
+    field: Option<String>,
+
+    /// Prover backend (defaults to "nova")
+    #[clap(long, value_parser)]
+    backend: Option<String>,
 }
 
 #[derive(Parser, Debug)]
@@ -77,14 +86,23 @@ struct LoadCli {
     #[clap(long, value_parser)]
     zstore: Option<PathBuf>,
 
-    #[clap(long, value_parser)]
-    limit: Option<usize>,
-
     #[arg(long)]
     prove: bool,
 
     #[clap(long, value_parser)]
+    config: Option<PathBuf>,
+
+    #[clap(long, value_parser)]
+    limit: Option<usize>,
+
+    #[clap(long, value_parser)]
     rc: Option<usize>,
+
+    #[clap(long, value_parser)]
+    field: Option<String>,
+
+    #[clap(long, value_parser)]
+    backend: Option<String>,
 }
 
 impl LoadArgs {
@@ -92,9 +110,12 @@ impl LoadArgs {
         LoadCli {
             lurk_file: self.lurk_file,
             zstore: self.zstore,
-            limit: self.limit,
             prove: self.prove,
+            config: self.config,
+            limit: self.limit,
             rc: self.rc,
+            field: self.field,
+            backend: self.backend,
         }
     }
 }
@@ -109,6 +130,10 @@ struct ReplArgs {
     #[clap(long, value_parser)]
     load: Option<PathBuf>,
 
+    /// Config file (higher precedence than env vars and lower than CLI args)
+    #[clap(long, value_parser)]
+    config: Option<PathBuf>,
+
     /// Maximum number of iterations allowed (defaults to 100_000_000)
     #[clap(long, value_parser)]
     limit: Option<usize>,
@@ -116,6 +141,14 @@ struct ReplArgs {
     /// Reduction count used for proofs (defaults to 10)
     #[clap(long, value_parser)]
     rc: Option<usize>,
+
+    /// Arithmetic field (defaults to "pallas")
+    #[clap(long, value_parser)]
+    field: Option<String>,
+
+    /// Prover backend (defaults to "nova")
+    #[clap(long, value_parser)]
+    backend: Option<String>,
 }
 
 #[derive(Parser, Debug)]
@@ -127,10 +160,19 @@ struct ReplCli {
     zstore: Option<PathBuf>,
 
     #[clap(long, value_parser)]
+    config: Option<PathBuf>,
+
+    #[clap(long, value_parser)]
     limit: Option<usize>,
 
     #[clap(long, value_parser)]
     rc: Option<usize>,
+
+    #[clap(long, value_parser)]
+    field: Option<String>,
+
+    #[clap(long, value_parser)]
+    backend: Option<String>,
 }
 
 impl ReplArgs {
@@ -138,23 +180,70 @@ impl ReplArgs {
         ReplCli {
             load: self.load,
             zstore: self.zstore,
+            config: self.config,
             limit: self.limit,
             rc: self.rc,
+            field: self.field,
+            backend: self.backend,
         }
     }
 }
 
-fn get_field() -> Result<LanguageField> {
-    if let Ok(lurk_field) = std::env::var("LURK_FIELD") {
-        match lurk_field.to_lowercase().as_str() {
-            "bls12-381" => Ok(LanguageField::BLS12_381),
-            "pallas" => Ok(LanguageField::Pallas),
-            "vesta" => Ok(LanguageField::Vesta),
-            _ => bail!("Field not supported: {lurk_field}"),
-        }
-    } else {
-        Ok(DEFAULT_FIELD)
+fn parse_field(field_str: &String) -> Result<LanguageField> {
+    match field_str.to_lowercase().as_str() {
+        "pallas" => Ok(LanguageField::Pallas),
+        "vesta" => Ok(LanguageField::Vesta),
+        "bls12-381" => Ok(LanguageField::BLS12_381),
+        _ => bail!("Field not supported: {field_str}"),
     }
+}
+
+fn parse_backend(backend_str: &String) -> Result<Backend> {
+    match backend_str.to_lowercase().as_str() {
+        "nova" => Ok(Backend::Nova),
+        "groth16" => Ok(Backend::Groth16),
+        _ => bail!("Backend not supported: {backend_str}"),
+    }
+}
+
+fn get_parsed_usize(
+    param_name: &str,
+    arg: &Option<usize>,
+    config: &HashMap<String, String>,
+    default: usize,
+) -> Result<usize> {
+    match arg {
+        Some(arg) => Ok(*arg),
+        None => match config.get(param_name) {
+            None => Ok(default),
+            Some(arg_str) => Ok(arg_str.parse::<usize>()?),
+        },
+    }
+}
+
+fn get_parsed<T>(
+    param_name: &str,
+    arg: &Option<String>,
+    config: &HashMap<String, String>,
+    parse_fn: fn(&String) -> Result<T>,
+    default: T,
+) -> Result<T> {
+    match arg {
+        Some(arg) => parse_fn(arg),
+        None => match config.get(param_name) {
+            None => Ok(default),
+            Some(arg) => parse_fn(arg),
+        },
+    }
+}
+
+fn get_config(config_path: &Option<PathBuf>) -> Result<HashMap<String, String>> {
+    let builder = Config::builder().add_source(Environment::with_prefix("LURK"));
+    let builder = match config_path {
+        Some(config_path) => builder.add_source(File::from(config_path.to_owned())),
+        None => builder,
+    };
+    Ok(builder.build()?.try_deserialize()?)
 }
 
 fn get_store<F: LurkField + for<'a> serde::de::Deserialize<'a>>(
@@ -172,30 +261,39 @@ fn get_store<F: LurkField + for<'a> serde::de::Deserialize<'a>>(
 }
 
 macro_rules! new_repl {
-    ( $cli: expr, $field: path ) => {{
-        let limit = $cli.limit.unwrap_or(DEFAULT_LIMIT);
-        let rc = $cli.rc.unwrap_or(DEFAULT_RC);
+    ( $cli: expr, $limit: expr, $rc: expr, $field: path, $backend: expr ) => {{
         let mut store = get_store(&$cli.zstore).with_context(|| "reading store from file")?;
         let env = store.nil();
-        Repl::<$field, Coproc<$field>>::new(store, env, limit, rc)?
+        Repl::<$field, Coproc<$field>>::new(store, env, $limit, $rc, $backend)?
     }};
 }
 
 impl ReplCli {
     pub fn run(&self) -> Result<()> {
         macro_rules! repl {
-            ( $field: path ) => {{
-                let mut repl = new_repl!(self, $field);
+            ( $limit: expr, $rc: expr, $field: path, $backend: expr ) => {{
+                let mut repl = new_repl!(self, $limit, $rc, $field, $backend);
                 if let Some(lurk_file) = &self.load {
                     repl.load_file(lurk_file)?;
                 }
                 repl.start()
             }};
         }
-        match get_field()? {
-            LanguageField::Pallas => repl!(pallas::Scalar),
-            LanguageField::Vesta => repl!(vesta::Scalar),
-            LanguageField::BLS12_381 => repl!(blstrs::Scalar),
+        let config = get_config(&self.config)?;
+        let limit = get_parsed_usize("limit", &self.limit, &config, DEFAULT_LIMIT)?;
+        let rc = get_parsed_usize("rc", &self.rc, &config, DEFAULT_RC)?;
+        let field = get_parsed("field", &self.field, &config, parse_field, DEFAULT_FIELD)?;
+        let backend = get_parsed(
+            "backend",
+            &self.backend,
+            &config,
+            parse_backend,
+            DEFAULT_BACKEND,
+        )?;
+        match field {
+            LanguageField::Pallas => repl!(limit, rc, pallas::Scalar, backend),
+            LanguageField::Vesta => repl!(limit, rc, vesta::Scalar, backend),
+            LanguageField::BLS12_381 => repl!(limit, rc, blstrs::Scalar, backend),
         }
     }
 }
@@ -203,8 +301,8 @@ impl ReplCli {
 impl LoadCli {
     pub fn run(&self) -> Result<()> {
         macro_rules! load {
-            ( $field: path ) => {{
-                let mut repl = new_repl!(self, $field);
+            ( $limit: expr, $rc: expr, $field: path, $backend: expr ) => {{
+                let mut repl = new_repl!(self, $limit, $rc, $field, $backend);
                 repl.load_file(&self.lurk_file)?;
                 if self.prove {
                     repl.prove_last_claim()?;
@@ -212,10 +310,21 @@ impl LoadCli {
                 Ok(())
             }};
         }
-        match get_field()? {
-            LanguageField::Pallas => load!(pallas::Scalar),
-            LanguageField::Vesta => load!(vesta::Scalar),
-            LanguageField::BLS12_381 => load!(blstrs::Scalar),
+        let config = get_config(&self.config)?;
+        let limit = get_parsed_usize("limit", &self.limit, &config, DEFAULT_LIMIT)?;
+        let rc = get_parsed_usize("rc", &self.rc, &config, DEFAULT_RC)?;
+        let field = get_parsed("field", &self.field, &config, parse_field, DEFAULT_FIELD)?;
+        let backend = get_parsed(
+            "backend",
+            &self.backend,
+            &config,
+            parse_backend,
+            DEFAULT_BACKEND,
+        )?;
+        match field {
+            LanguageField::Pallas => load!(limit, rc, pallas::Scalar, backend),
+            LanguageField::Vesta => load!(limit, rc, vesta::Scalar, backend),
+            LanguageField::BLS12_381 => load!(limit, rc, blstrs::Scalar, backend),
         }
     }
 }
@@ -230,6 +339,7 @@ struct VerifyArgs {
 pub fn parse_and_run() -> Result<()> {
     #[cfg(not(target_arch = "wasm32"))]
     paths::create_lurk_dir()?;
+
     if let Ok(repl_cli) = ReplCli::try_parse() {
         repl_cli.run()
     } else if let Ok(load_cli) = LoadCli::try_parse() {
