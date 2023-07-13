@@ -47,7 +47,8 @@ pub struct LurkProofInfo {
     pub rc: usize,
     pub lang: Lang<F, Coproc<F>>,
     pub iterations: usize,
-    pub cost: u128,
+    pub generation_cost: u128,
+    pub compression_cost: u128,
 }
 
 #[derive(Serialize, Deserialize)]

@@ -171,14 +171,14 @@ impl Repl<F> {
 
                     info!("Hydrating the store");
                     self.store.hydrate_scalar_cache();
-                    info!("Proving");
+                    info!("Proving and compressing");
                     let start = Instant::now();
                     let (proof, z0, zi, num_steps) =
                         prover.prove(&pp, frames, &mut self.store, self.lang.clone())?;
-                    let end = Instant::now();
-                    assert_eq!(self.rc * num_steps, n_frames);
-                    info!("Compressing proof");
+                    let generation = Instant::now();
                     let proof = proof.compress(&pp)?;
+                    let compression = Instant::now();
+                    assert_eq!(self.rc * num_steps, n_frames);
                     assert!(proof.verify(&pp, num_steps, &z0, &zi)?);
 
                     let nova_proof = NovaProof {
@@ -191,7 +191,8 @@ impl Repl<F> {
                         rc: self.rc,
                         lang: (*self.lang).clone(),
                         iterations,
-                        cost: end.duration_since(start).as_nanos(),
+                        generation_cost: generation.duration_since(start).as_nanos(),
+                        compression_cost: compression.duration_since(generation).as_nanos(),
                     };
                     let lurk_proof = LurkProof::new_nova(nova_proof, info, meta);
                     let name = &format!("{}", timestamp());
