@@ -313,7 +313,7 @@ fn verify_benchmark(c: &mut Criterion) {
             b.iter_batched(
                 || z0.clone(),
                 |z0| {
-                    let result = proof.verify(&pp, num_steps, z0, &zi[..]).unwrap();
+                    let result = proof.verify(&pp, num_steps, &z0, &zi[..]).unwrap();
                     black_box(result);
                 },
                 BatchSize::LargeInput,
@@ -361,7 +361,7 @@ fn verify_compressed_benchmark(c: &mut Criterion) {
                 || z0.clone(),
                 |z0| {
                     let result = compressed_proof
-                        .verify(&pp, num_steps, z0, &zi[..])
+                        .verify(&pp, num_steps, &z0, &zi[..])
                         .unwrap();
                     black_box(result);
                 },

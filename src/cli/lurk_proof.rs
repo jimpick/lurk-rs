@@ -32,13 +32,13 @@ impl<'a> NovaProof<'a> {
 #[derive(Serialize, Deserialize)]
 pub enum LurkProofMeta {
     Evaluation {
-        input: String,
-        environment: String,
-        output: String,
+        input: Option<String>,
+        environment: Option<String>,
+        output: Option<String>,
     },
     Opening {
-        input: String,
-        output: String,
+        input: Option<String>,
+        output: Option<String>,
     },
 }
 

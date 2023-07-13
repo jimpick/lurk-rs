@@ -164,9 +164,9 @@ impl Repl<F> {
                     // save before mutating the store
                     let input = &frames[0].input;
                     let meta = LurkProofMeta::Evaluation {
-                        input: input.expr.fmt_to_string(&self.store),
-                        environment: input.env.fmt_to_string(&self.store),
-                        output: frames[iterations].output.expr.fmt_to_string(&self.store),
+                        input: Some(input.expr.fmt_to_string(&self.store)),
+                        environment: Some(input.env.fmt_to_string(&self.store)),
+                        output: Some(frames[iterations].output.expr.fmt_to_string(&self.store)),
                     };
 
                     info!("Hydrating the store");

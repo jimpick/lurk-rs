@@ -55,7 +55,7 @@ struct LoadArgs {
     #[arg(long)]
     prove: bool,
 
-    /// Config file (higher precedence than env vars and lower than CLI args)
+    /// Config file, containing the lowest precedence parameters
     #[clap(long, value_parser)]
     config: Option<PathBuf>,
 
@@ -128,7 +128,7 @@ struct ReplArgs {
     #[clap(long, value_parser)]
     load: Option<PathBuf>,
 
-    /// Config file (higher precedence than env vars and lower than CLI args)
+    /// Config file, containing the lowest precedence parameters
     #[clap(long, value_parser)]
     config: Option<PathBuf>,
 
@@ -236,11 +236,13 @@ fn get_parsed<T>(
 }
 
 fn get_config(config_path: &Option<PathBuf>) -> Result<HashMap<String, String>> {
-    let builder = Config::builder().add_source(Environment::with_prefix("LURK"));
+    // First load from the config file
     let builder = match config_path {
-        Some(config_path) => builder.add_source(File::from(config_path.to_owned())),
-        None => builder,
+        Some(config_path) => Config::builder().add_source(File::from(config_path.to_owned())),
+        None => Config::builder(),
     };
+    // Then potentially overwrite with environment variables
+    let builder = builder.add_source(Environment::with_prefix("LURK"));
     Ok(builder.build()?.try_deserialize()?)
 }
 
