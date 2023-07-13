@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::path::Path;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use std::{fs::read_to_string, process};
 
 use anyhow::{bail, Context, Result};
@@ -16,8 +16,6 @@ use rustyline::{
 };
 use rustyline_derive::{Completer, Helper, Highlighter, Hinter};
 
-use serde::{Deserialize, Serialize};
-
 use lurk::{
     eval::{
         lang::{Coproc, Lang},
@@ -25,7 +23,7 @@ use lurk::{
     },
     field::LurkField,
     parser,
-    proof::{nova, nova::NovaProver, Prover},
+    proof::{nova::NovaProver, Prover},
     ptr::Ptr,
     public_parameters::public_params,
     store::Store,
@@ -34,7 +32,11 @@ use lurk::{
     Num, UInt,
 };
 
-use crate::cli::paths::proof_path;
+use super::{
+    lurk_proof::{LurkProof, LurkProofInfo, LurkProofMeta, NovaProof},
+    paths::proof_path,
+};
+
 #[cfg(not(target_arch = "wasm32"))]
 use crate::cli::paths::repl_history;
 
@@ -85,90 +87,30 @@ fn pad(a: usize, m: usize) -> usize {
     }
 }
 
+fn timestamp() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("We're after UNIX_EPOCH")
+        .as_nanos()
+}
+
 type F = pasta_curves::pallas::Scalar;
-
-#[derive(Serialize, Deserialize)]
-struct NovaProof<'a> {
-    proof: nova::Proof<'a, Coproc<F>>,
-    public_inputs: Vec<F>,
-    public_outputs: Vec<F>,
-    num_steps: usize,
-}
-
-#[derive(Serialize, Deserialize)]
-struct LurkProofMeta {
-    rc: usize,
-    lang: Lang<F, Coproc<F>>,
-    expr: String,
-    env: String,
-    expr_out: String,
-    iterations: usize,
-    timestamp: u128,
-}
-
-#[derive(Serialize, Deserialize)]
-enum LurkProof<'a> {
-    Nova(NovaProof<'a>, LurkProofMeta),
-}
-
-impl<'a> LurkProof<'a> {
-    pub(crate) fn new_nova(
-        proof: NovaProof<'a>,
-        rc: usize,
-        lang: Lang<F, Coproc<F>>,
-        expr: String,
-        env: String,
-        expr_out: String,
-        iterations: usize,
-    ) -> Self {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        Self::Nova(
-            proof,
-            LurkProofMeta {
-                rc,
-                lang,
-                expr,
-                env,
-                expr_out,
-                iterations,
-                timestamp,
-            },
-        )
-    }
-
-    fn meta(&self) -> &LurkProofMeta {
-        match self {
-            Self::Nova(_, meta) => meta,
-        }
-    }
-
-    pub(crate) fn name(&self) -> String {
-        let meta = self.meta();
-        format!("rc{}_{}", meta.rc, meta.timestamp)
-    }
-}
 
 pub fn verify_proof(proof_id: &str) -> Result<()> {
     let file = File::open(proof_path(proof_id))?;
     let reader = BufReader::new(file);
     let lurk_proof: LurkProof = bincode::deserialize_from(reader)?;
     match lurk_proof {
-        LurkProof::Nova(nova_proof, proof_meta) => {
-            let NovaProof {
-                proof,
-                public_inputs,
-                public_outputs,
-                num_steps,
-            } = nova_proof;
-
+        LurkProof::Nova {
+            proof,
+            info,
+            meta: _,
+        } => {
             info!("Loading public parameters");
             // TODO: save public params somewhere in `~/.lurk`
-            let pp = public_params(proof_meta.rc, Arc::new(proof_meta.lang))?;
+            let pp = public_params(info.rc, Arc::new(info.lang))?;
 
-            if proof.verify(&pp, num_steps, &public_inputs, &public_outputs)? {
+            if proof.verify(&pp)? {
                 println!("✓ Proof {proof_id} verified");
             } else {
                 println!("✗ Proof {proof_id} failed on verification");
@@ -221,15 +163,19 @@ impl Repl<F> {
 
                     // save before mutating the store
                     let input = &frames[0].input;
-                    let expr = input.expr.fmt_to_string(&self.store);
-                    let env = input.env.fmt_to_string(&self.store);
-                    let expr_out = frames[iterations].output.expr.fmt_to_string(&self.store);
+                    let meta = LurkProofMeta::Evaluation {
+                        input: input.expr.fmt_to_string(&self.store),
+                        environment: input.env.fmt_to_string(&self.store),
+                        output: frames[iterations].output.expr.fmt_to_string(&self.store),
+                    };
 
                     info!("Hydrating the store");
                     self.store.hydrate_scalar_cache();
                     info!("Proving");
+                    let start = Instant::now();
                     let (proof, z0, zi, num_steps) =
                         prover.prove(&pp, frames, &mut self.store, self.lang.clone())?;
+                    let end = Instant::now();
                     assert_eq!(self.rc * num_steps, n_frames);
                     info!("Compressing proof");
                     let proof = proof.compress(&pp)?;
@@ -241,17 +187,15 @@ impl Repl<F> {
                         public_outputs: zi,
                         num_steps,
                     };
-                    let lurk_proof = LurkProof::new_nova(
-                        nova_proof,
-                        self.rc,
-                        (*self.lang).clone(),
-                        expr,
-                        env,
-                        expr_out,
+                    let info = LurkProofInfo {
+                        rc: self.rc,
+                        lang: (*self.lang).clone(),
                         iterations,
-                    );
-                    let name = lurk_proof.name();
-                    let file = File::create(proof_path(&name))?;
+                        cost: end.duration_since(start).as_nanos(),
+                    };
+                    let lurk_proof = LurkProof::new_nova(nova_proof, info, meta);
+                    let name = &format!("{}", timestamp());
+                    let file = File::create(proof_path(name))?;
                     bincode::serialize_into(BufWriter::new(&file), &lurk_proof)?;
                     println!("Proof ID: {name}");
                     Ok(())

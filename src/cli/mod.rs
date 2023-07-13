@@ -1,3 +1,4 @@
+mod lurk_proof;
 mod paths;
 mod repl;
 
