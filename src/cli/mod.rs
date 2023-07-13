@@ -16,7 +16,7 @@ use pasta_curves::pallas;
 
 use clap::{Args, Parser, Subcommand};
 
-use self::repl::{Backend, Repl};
+use self::repl::{verify_proof, Backend, Repl};
 
 const DEFAULT_LIMIT: usize = 100_000_000;
 const DEFAULT_RC: usize = 10;
@@ -332,8 +332,9 @@ impl LoadCli {
 
 #[derive(Args, Debug)]
 struct VerifyArgs {
+    /// ID of the proof to be verified
     #[clap(value_parser)]
-    proof_file: PathBuf,
+    proof_id: String,
 }
 
 /// Parses CLI arguments and continues the program flow accordingly
@@ -349,7 +350,7 @@ pub fn parse_and_run() -> Result<()> {
         match Cli::parse().command {
             Command::Repl(repl_args) => repl_args.into_cli().run(),
             Command::Load(load_args) => load_args.into_cli().run(),
-            Command::Verify(_verify_args) => todo!(),
+            Command::Verify(verify_args) => verify_proof(&verify_args.proof_id),
         }
     }
 }

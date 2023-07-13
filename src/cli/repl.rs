@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::BufWriter;
+use std::io::{BufReader, BufWriter};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -16,6 +16,8 @@ use rustyline::{
 };
 use rustyline_derive::{Completer, Helper, Highlighter, Hinter};
 
+use serde::{Deserialize, Serialize};
+
 use lurk::{
     eval::{
         lang::{Coproc, Lang},
@@ -31,7 +33,6 @@ use lurk::{
     writer::Write,
     Num, UInt,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::cli::paths::proof_path;
 #[cfg(not(target_arch = "wasm32"))]
@@ -97,6 +98,7 @@ struct NovaProof<'a> {
 #[derive(Serialize, Deserialize)]
 struct LurkProofMeta {
     rc: usize,
+    lang: Lang<F, Coproc<F>>,
     expr: String,
     env: String,
     expr_out: String,
@@ -113,6 +115,7 @@ impl<'a> LurkProof<'a> {
     pub(crate) fn new_nova(
         proof: NovaProof<'a>,
         rc: usize,
+        lang: Lang<F, Coproc<F>>,
         expr: String,
         env: String,
         expr_out: String,
@@ -126,6 +129,7 @@ impl<'a> LurkProof<'a> {
             proof,
             LurkProofMeta {
                 rc,
+                lang,
                 expr,
                 env,
                 expr_out,
@@ -145,6 +149,33 @@ impl<'a> LurkProof<'a> {
         let meta = self.meta();
         format!("rc{}_{}", meta.rc, meta.timestamp)
     }
+}
+
+pub fn verify_proof(proof_id: &str) -> Result<()> {
+    let file = File::open(proof_path(proof_id))?;
+    let reader = BufReader::new(file);
+    let lurk_proof: LurkProof = bincode::deserialize_from(reader)?;
+    match lurk_proof {
+        LurkProof::Nova(nova_proof, proof_meta) => {
+            let NovaProof {
+                proof,
+                public_inputs,
+                public_outputs,
+                num_steps,
+            } = nova_proof;
+
+            info!("Loading public parameters");
+            // TODO: save public params somewhere in `~/.lurk`
+            let pp = public_params(proof_meta.rc, Arc::new(proof_meta.lang))?;
+
+            if proof.verify(&pp, num_steps, &public_inputs, &public_outputs)? {
+                println!("✓ Proof {proof_id} verified");
+            } else {
+                println!("✗ Proof {proof_id} failed on verification");
+            }
+        }
+    }
+    Ok(())
 }
 
 impl Repl<F> {
@@ -183,6 +214,8 @@ impl Repl<F> {
                     let n_frames = frames.len();
 
                     let prover = NovaProver::new(self.rc, (*self.lang).clone());
+
+                    info!("Loading public parameters");
                     // TODO: save public params somewhere in `~/.lurk`
                     let pp = public_params(self.rc, self.lang.clone())?;
 
@@ -208,12 +241,19 @@ impl Repl<F> {
                         public_outputs: zi,
                         num_steps,
                     };
-                    let lurk_proof =
-                        LurkProof::new_nova(nova_proof, self.rc, expr, env, expr_out, iterations);
+                    let lurk_proof = LurkProof::new_nova(
+                        nova_proof,
+                        self.rc,
+                        (*self.lang).clone(),
+                        expr,
+                        env,
+                        expr_out,
+                        iterations,
+                    );
                     let name = lurk_proof.name();
                     let file = File::create(proof_path(&name))?;
                     bincode::serialize_into(BufWriter::new(&file), &lurk_proof)?;
-                    println!("Proof: {name}");
+                    println!("Proof ID: {name}");
                     Ok(())
                 }
                 Backend::Groth16 => todo!(),
@@ -411,7 +451,16 @@ impl Repl<F> {
                 self.prove_last_frames()?;
             }
             "verify" => {
-                todo!()
+                let first = self.peek1(cmd, args)?;
+                match self.store.fetch_string(&first) {
+                    None => bail!(
+                        "Proof ID {} not parsed as a string",
+                        first.fmt_to_string(&self.store)
+                    ),
+                    Some(proof_id) => {
+                        verify_proof(&proof_id)?;
+                    }
+                }
             }
             _ => bail!("Unsupported meta command: {cmd}"),
         }
