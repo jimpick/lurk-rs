@@ -340,7 +340,7 @@ impl<'a: 'b, 'b, C: Coprocessor<S1>> Proof<'a, C> {
         &self,
         pp: &PublicParams<'_, C>,
         num_steps: usize,
-        z0: Vec<S1>,
+        z0: &[S1],
         zi: &[S1],
     ) -> Result<bool, NovaError> {
         let (z0_primary, zi_primary) = (z0, zi);
@@ -348,8 +348,8 @@ impl<'a: 'b, 'b, C: Coprocessor<S1>> Proof<'a, C> {
         let zi_secondary = z0_secondary.clone();
 
         let (zi_primary_verified, zi_secondary_verified) = match self {
-            Self::Recursive(p) => p.verify(&pp.pp, num_steps, &z0_primary, &z0_secondary),
-            Self::Compressed(p) => p.verify(&pp.vk, num_steps, z0_primary, z0_secondary),
+            Self::Recursive(p) => p.verify(&pp.pp, num_steps, z0_primary, &z0_secondary),
+            Self::Compressed(p) => p.verify(&pp.vk, num_steps, z0_primary.to_vec(), z0_secondary),
         }?;
 
         Ok(zi_primary == zi_primary_verified && zi_secondary == zi_secondary_verified)
@@ -471,14 +471,14 @@ pub mod tests {
                 .evaluate_and_prove(&pp, expr, empty_sym_env(s), s, limit, lang.clone())
                 .unwrap();
 
-            let res = proof.verify(&pp, num_steps, z0.clone(), &zi);
+            let res = proof.verify(&pp, num_steps, &z0, &zi);
             if res.is_err() {
                 dbg!(&res);
             }
             assert!(res.unwrap());
 
             let compressed = proof.compress(&pp).unwrap();
-            let res2 = compressed.verify(&pp, num_steps, z0, &zi);
+            let res2 = compressed.verify(&pp, num_steps, &z0, &zi);
 
             assert!(res2.unwrap());
         }

@@ -1,10 +1,13 @@
-use std::io;
+use std::fs::File;
+use std::io::BufWriter;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs::read_to_string, process};
 
 use anyhow::{bail, Context, Result};
 
+use log::info;
 use rustyline::{
     error::ReadlineError,
     history::DefaultHistory,
@@ -20,7 +23,7 @@ use lurk::{
     },
     field::LurkField,
     parser,
-    proof::{nova::NovaProver, Prover},
+    proof::{nova, nova::NovaProver, Prover},
     ptr::Ptr,
     public_parameters::public_params,
     store::Store,
@@ -28,7 +31,9 @@ use lurk::{
     writer::Write,
     Num, UInt,
 };
+use serde::{Deserialize, Serialize};
 
+use crate::cli::paths::proof_path;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::cli::paths::repl_history;
 
@@ -50,7 +55,6 @@ pub enum Backend {
 
 type FrameVec<F> = Vec<Frame<IO<F>, Witness<F>, Coproc<F>>>;
 
-#[allow(dead_code)]
 pub struct Repl<F: LurkField> {
     store: Store<F>,
     env: Ptr<F>,
@@ -68,20 +72,80 @@ fn check_non_zero(name: &str, x: usize) -> Result<()> {
     Ok(())
 }
 
-/// Pads the number of iterations to the first multiple of the reduction count
-/// that's equal or greater than the number of iterations
+/// `pad(a, m)` returns the first multiple of `m` that's equal or greater than `a`
 ///
-/// Panics if reduction count is zero
-fn pad_iterations(iterations: usize, rc: usize) -> usize {
-    let lower = rc * (iterations / rc);
-    if lower < iterations {
-        lower + rc
+/// Panics if `m` is zero
+fn pad(a: usize, m: usize) -> usize {
+    let lower = m * (a / m);
+    if lower < a {
+        lower + m
     } else {
         lower
     }
 }
 
 type F = pasta_curves::pallas::Scalar;
+
+#[derive(Serialize, Deserialize)]
+struct NovaProof<'a> {
+    proof: nova::Proof<'a, Coproc<F>>,
+    public_inputs: Vec<F>,
+    public_outputs: Vec<F>,
+    num_steps: usize,
+}
+
+#[derive(Serialize, Deserialize)]
+struct LurkProofMeta {
+    rc: usize,
+    expr: String,
+    env: String,
+    expr_out: String,
+    iterations: usize,
+    timestamp: u128,
+}
+
+#[derive(Serialize, Deserialize)]
+enum LurkProof<'a> {
+    Nova(NovaProof<'a>, LurkProofMeta),
+}
+
+impl<'a> LurkProof<'a> {
+    pub(crate) fn new_nova(
+        proof: NovaProof<'a>,
+        rc: usize,
+        expr: String,
+        env: String,
+        expr_out: String,
+        iterations: usize,
+    ) -> Self {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        Self::Nova(
+            proof,
+            LurkProofMeta {
+                rc,
+                expr,
+                env,
+                expr_out,
+                iterations,
+                timestamp,
+            },
+        )
+    }
+
+    fn meta(&self) -> &LurkProofMeta {
+        match self {
+            Self::Nova(_, meta) => meta,
+        }
+    }
+
+    pub(crate) fn name(&self) -> String {
+        let meta = self.meta();
+        format!("rc{}_{}", meta.rc, meta.timestamp)
+    }
+}
 
 impl Repl<F> {
     pub fn new(
@@ -106,22 +170,54 @@ impl Repl<F> {
 
     pub fn prove_last_frames(&mut self) -> Result<()> {
         match &self.last_frames {
-            None => bail!("No claim to prove"),
-            Some(frames) => {
-                // TODO: case on self.backend
-                let mut frames = frames.clone();
-                let n_frames = frames.len();
-                for _ in 0..pad_iterations(n_frames, self.rc) - n_frames {
-                    frames.push(frames[frames.len() - 1].clone())
+            None => bail!("No computation to prove"),
+            Some(frames) => match self.backend {
+                Backend::Nova => {
+                    // padding the frames
+                    let mut frames = frames.clone(); // don't mutate memoized frames
+                    let n_frames = frames.len();
+                    let iterations = n_frames - 1;
+                    for _ in 0..pad(n_frames, self.rc) - n_frames {
+                        frames.push(frames[frames.len() - 1].clone())
+                    }
+                    let n_frames = frames.len();
+
+                    let prover = NovaProver::new(self.rc, (*self.lang).clone());
+                    // TODO: save public params somewhere in `~/.lurk`
+                    let pp = public_params(self.rc, self.lang.clone())?;
+
+                    // save before mutating the store
+                    let input = &frames[0].input;
+                    let expr = input.expr.fmt_to_string(&self.store);
+                    let env = input.env.fmt_to_string(&self.store);
+                    let expr_out = frames[iterations].output.expr.fmt_to_string(&self.store);
+
+                    info!("Hydrating the store");
+                    self.store.hydrate_scalar_cache();
+                    info!("Proving");
+                    let (proof, z0, zi, num_steps) =
+                        prover.prove(&pp, frames, &mut self.store, self.lang.clone())?;
+                    assert_eq!(self.rc * num_steps, n_frames);
+                    info!("Compressing proof");
+                    let proof = proof.compress(&pp)?;
+                    assert!(proof.verify(&pp, num_steps, &z0, &zi)?);
+
+                    let nova_proof = NovaProof {
+                        proof,
+                        public_inputs: z0,
+                        public_outputs: zi,
+                        num_steps,
+                    };
+                    let lurk_proof =
+                        LurkProof::new_nova(nova_proof, self.rc, expr, env, expr_out, iterations);
+                    let name = lurk_proof.name();
+                    let file = File::create(proof_path(&name))?;
+                    bincode::serialize_into(BufWriter::new(&file), &lurk_proof)?;
+                    println!("Proof: {name}");
+                    Ok(())
                 }
-                let prover = NovaProver::new(self.rc, (*self.lang).clone());
-                let pp = public_params(self.rc, self.lang.clone())?;
-                self.store.hydrate_scalar_cache();
-                let (proof, z0, zi, num_steps) =
-                    prover.prove(&pp, frames, &mut self.store, self.lang.clone())?;
-                assert!(proof.verify(&pp, num_steps, z0, &zi)?);
-                Ok(())
-            }
+                Backend::Groth16 => todo!(),
+            },
         }
     }
 
@@ -227,7 +323,7 @@ impl Repl<F> {
                     }
                     _ => bail!("Argument of `load` must be a string."),
                 }
-                io::Write::flush(&mut io::stdout()).unwrap();
+                std::io::Write::flush(&mut std::io::stdout()).unwrap();
             }
             "assert" => {
                 let first = self.peek1(cmd, args)?;
@@ -346,6 +442,7 @@ impl Repl<F> {
 
         let mut iterations = last_idx;
 
+        // FIXME: proving is not working for incomplete computations
         if last_frame.is_complete() {
             self.last_frames = Some(frames)
         } else {
@@ -365,9 +462,7 @@ impl Repl<F> {
                 };
 
                 let suffix = match output.cont.tag {
-                    ContTag::Outermost | ContTag::Terminal => {
-                        output.expr.fmt_to_string(&self.store)
-                    }
+                    ContTag::Terminal => output.expr.fmt_to_string(&self.store),
                     ContTag::Error => "ERROR!".into(),
                     _ => "Computation incomplete (limit reached)".into(),
                 };
@@ -473,11 +568,11 @@ impl Repl<F> {
 mod test {
     #[test]
     fn test_padding() {
-        use crate::cli::repl::pad_iterations;
-        assert_eq!(pad_iterations(61, 10), 70);
-        assert_eq!(pad_iterations(1, 10), 10);
-        assert_eq!(pad_iterations(61, 1), 61);
-        assert_eq!(pad_iterations(610, 10), 610);
-        assert_eq!(pad_iterations(619, 20), 620);
+        use crate::cli::repl::pad;
+        assert_eq!(pad(61, 10), 70);
+        assert_eq!(pad(1, 10), 10);
+        assert_eq!(pad(61, 1), 61);
+        assert_eq!(pad(610, 10), 610);
+        assert_eq!(pad(619, 20), 620);
     }
 }
