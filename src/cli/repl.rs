@@ -1,15 +1,13 @@
 use std::path::Path;
 use std::sync::Arc;
 
-#[cfg(not(target_arch = "wasm32"))]
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
-
 use std::{fs::read_to_string, process};
 
 #[cfg(not(target_arch = "wasm32"))]
 use std::{
     fs::File,
     io::{BufReader, BufWriter},
+    time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
 use anyhow::{bail, Context, Result};
@@ -76,9 +74,9 @@ pub struct Repl<F: LurkField> {
     env: Ptr<F>,
     limit: usize,
     lang: Arc<Lang<F, Coproc<F>>>,
-    last_frames: Option<FrameVec<F>>,
     rc: usize,
     backend: Backend,
+    frames: Option<FrameVec<F>>,
 }
 
 fn check_non_zero(name: &str, x: usize) -> Result<()> {
@@ -157,15 +155,15 @@ impl Repl<F> {
             env,
             limit,
             lang: Arc::new(Lang::new()),
-            last_frames: None,
             rc,
             backend,
+            frames: None,
         })
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn prove_last_frames(&mut self) -> Result<()> {
-        match &self.last_frames {
+        match &self.frames {
             None => bail!("No computation to prove"),
             Some(frames) => match self.backend {
                 Backend::Nova => {
@@ -420,7 +418,7 @@ impl Repl<F> {
             }
             "prove" => {
                 if !args.is_nil() {
-                    self.eval_expr_and_set_last_frames(self.peek1(cmd, args)?)?;
+                    self.eval_expr_and_memo_frames(self.peek1(cmd, args)?)?;
                 }
                 #[cfg(not(target_arch = "wasm32"))]
                 self.prove_last_frames()?;
@@ -459,7 +457,7 @@ impl Repl<F> {
         Ok(())
     }
 
-    fn eval_expr_and_set_last_frames(&mut self, expr_ptr: Ptr<F>) -> Result<(IO<F>, usize)> {
+    fn eval_expr_and_memo_frames(&mut self, expr_ptr: Ptr<F>) -> Result<(IO<F>, usize)> {
         let frames = Evaluator::new(expr_ptr, self.env, &mut self.store, self.limit, &self.lang)
             .get_frames()?;
 
@@ -471,7 +469,7 @@ impl Repl<F> {
 
         // FIXME: proving is not working for incomplete computations
         if last_frame.is_complete() {
-            self.last_frames = Some(frames)
+            self.frames = Some(frames)
         } else {
             iterations += 1;
         }
@@ -480,7 +478,7 @@ impl Repl<F> {
     }
 
     fn handle_non_meta(&mut self, expr_ptr: Ptr<F>) -> Result<()> {
-        self.eval_expr_and_set_last_frames(expr_ptr)
+        self.eval_expr_and_memo_frames(expr_ptr)
             .map(|(output, iterations)| {
                 let prefix = if iterations != 1 {
                     format!("[{iterations} iterations] => ")

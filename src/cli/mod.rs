@@ -2,20 +2,18 @@ mod lurk_proof;
 mod paths;
 mod repl;
 
-use std::collections::HashMap;
-use std::fs;
-use std::path::PathBuf;
-
 use anyhow::{bail, Context, Result};
-
-use config::{Config, Environment, File};
-use lurk::field::{LanguageField, LurkField};
-use lurk::store::Store;
-use lurk::z_data::{from_z_data, ZData};
-use lurk::z_store::ZStore;
-use pasta_curves::pallas;
-
 use clap::{Args, Parser, Subcommand};
+use config::{Config, Environment, File};
+use pasta_curves::pallas;
+use std::{collections::HashMap, fs, path::PathBuf};
+
+use lurk::{
+    field::{LanguageField, LurkField},
+    store::Store,
+    z_data::{from_z_data, ZData},
+    z_store::ZStore,
+};
 
 use self::repl::{Backend, Repl};
 
