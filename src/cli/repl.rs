@@ -47,7 +47,7 @@ use lurk::{
 
 #[cfg(not(target_arch = "wasm32"))]
 use super::{
-    lurk_proof::{LurkProof, LurkProofInfo, LurkProofMeta, NovaProof},
+    lurk_proof::{LurkProof, NovaProof, ProofInfo},
     paths::proof_path,
     paths::repl_history,
 };
@@ -118,15 +118,13 @@ pub fn verify_proof(proof_id: &str) -> Result<()> {
     let lurk_proof: LurkProof = bincode::deserialize_from(reader)?;
     match lurk_proof {
         LurkProof::Nova {
-            proof,
-            info,
-            meta: _,
+            nova_proof,
+            proof_info,
         } => {
             info!("Loading public parameters");
-            // TODO: save public params somewhere in `~/.lurk`
-            let pp = public_params(info.rc, Arc::new(info.lang))?;
+            let pp = public_params(proof_info.rc, Arc::new(proof_info.lang))?;
 
-            if proof.verify(&pp)? {
+            if nova_proof.verify(&pp)? {
                 println!("✓ Proof {proof_id} verified");
             } else {
                 println!("✗ Proof {proof_id} failed on verification");
@@ -166,7 +164,7 @@ impl Repl<F> {
                     // padding the frames
                     let mut frames = frames.clone(); // don't mutate memoized frames
                     let n_frames = frames.len();
-                    let iterations = n_frames - 1;
+                    let iterations = n_frames - 1; // needs to be fixed for incomplete computations
                     for _ in 0..pad(n_frames, self.rc) - n_frames {
                         frames.push(frames[frames.len() - 1].clone())
                     }
@@ -175,16 +173,15 @@ impl Repl<F> {
                     let prover = NovaProver::new(self.rc, (*self.lang).clone());
 
                     info!("Loading public parameters");
-                    // TODO: save public params somewhere in `~/.lurk`
                     let pp = public_params(self.rc, self.lang.clone())?;
 
                     // save before mutating the store
                     let input = &frames[0].input;
-                    let meta = LurkProofMeta::Evaluation {
-                        input: Some(input.expr.fmt_to_string(&self.store)),
-                        environment: Some(input.env.fmt_to_string(&self.store)),
-                        output: Some(frames[iterations].output.expr.fmt_to_string(&self.store)),
-                    };
+                    let output = &frames[iterations].output;
+                    let status = output.cont.into();
+                    let expression = Some(input.expr.fmt_to_string(&self.store));
+                    let environment = Some(input.env.fmt_to_string(&self.store));
+                    let result = Some(output.expr.fmt_to_string(&self.store));
 
                     info!("Hydrating the store");
                     self.store.hydrate_scalar_cache();
@@ -198,20 +195,26 @@ impl Repl<F> {
                     assert_eq!(self.rc * num_steps, n_frames);
                     assert!(proof.verify(&pp, num_steps, &z0, &zi)?);
 
-                    let nova_proof = NovaProof {
-                        proof,
-                        public_inputs: z0,
-                        public_outputs: zi,
-                        num_steps,
+                    let lurk_proof = LurkProof::Nova {
+                        nova_proof: NovaProof {
+                            proof,
+                            public_inputs: z0,
+                            public_outputs: zi,
+                            num_steps,
+                        },
+                        proof_info: ProofInfo {
+                            rc: self.rc,
+                            lang: (*self.lang).clone(),
+                            iterations,
+                            generation_cost: generation.duration_since(start).as_nanos(),
+                            compression_cost: compression.duration_since(generation).as_nanos(),
+                            status,
+                            expression,
+                            environment,
+                            result,
+                        },
                     };
-                    let info = LurkProofInfo {
-                        rc: self.rc,
-                        lang: (*self.lang).clone(),
-                        iterations,
-                        generation_cost: generation.duration_since(start).as_nanos(),
-                        compression_cost: compression.duration_since(generation).as_nanos(),
-                    };
-                    let lurk_proof = LurkProof::new_nova(nova_proof, info, meta);
+
                     let name = &format!("{}", timestamp());
                     let file = File::create(proof_path(name))?;
                     bincode::serialize_into(BufWriter::new(&file), &lurk_proof)?;

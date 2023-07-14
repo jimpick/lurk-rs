@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use anyhow::Result;
 
 use lurk::{
-    eval::lang::{Coproc, Lang},
+    eval::{
+        lang::{Coproc, Lang},
+        Status,
+    },
     proof::nova,
 };
 
@@ -12,6 +15,19 @@ use lurk::{
 use lurk::proof::nova::PublicParams;
 
 type F = pasta_curves::pallas::Scalar;
+
+#[derive(Serialize, Deserialize)]
+pub struct ProofInfo {
+    pub rc: usize,
+    pub lang: Lang<F, Coproc<F>>,
+    pub iterations: usize,
+    pub generation_cost: u128,
+    pub compression_cost: u128,
+    pub status: Status,
+    pub expression: Option<String>,
+    pub environment: Option<String>,
+    pub result: Option<String>,
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct NovaProof<'a> {
@@ -35,40 +51,9 @@ impl<'a> NovaProof<'a> {
 }
 
 #[derive(Serialize, Deserialize)]
-pub enum LurkProofMeta {
-    Evaluation {
-        input: Option<String>,
-        environment: Option<String>,
-        output: Option<String>,
-    },
-    Opening {
-        input: Option<String>,
-        output: Option<String>,
-    },
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct LurkProofInfo {
-    pub rc: usize,
-    pub lang: Lang<F, Coproc<F>>,
-    pub iterations: usize,
-    pub generation_cost: u128,
-    pub compression_cost: u128,
-}
-
-#[derive(Serialize, Deserialize)]
 pub enum LurkProof<'a> {
     Nova {
-        proof: NovaProof<'a>,
-        info: LurkProofInfo,
-        meta: LurkProofMeta,
+        nova_proof: NovaProof<'a>,
+        proof_info: ProofInfo,
     },
-}
-
-impl<'a> LurkProof<'a> {
-    #[inline]
-    #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) fn new_nova(proof: NovaProof<'a>, info: LurkProofInfo, meta: LurkProofMeta) -> Self {
-        Self::Nova { proof, info, meta }
-    }
 }
