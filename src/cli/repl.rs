@@ -3,13 +3,6 @@ use std::sync::Arc;
 
 use std::{fs::read_to_string, process};
 
-#[cfg(not(target_arch = "wasm32"))]
-use std::{
-    fs::File,
-    io::BufWriter,
-    time::{Instant, SystemTime, UNIX_EPOCH},
-};
-
 use anyhow::{bail, Context, Result};
 
 use log::info;
@@ -37,17 +30,7 @@ use lurk::{
 };
 
 #[cfg(not(target_arch = "wasm32"))]
-use lurk::{
-    proof::{nova::NovaProver, Prover},
-    public_parameters::public_params,
-};
-
-#[cfg(not(target_arch = "wasm32"))]
-use super::{
-    lurk_proof::{LurkProof, NovaProof, ProofInfo},
-    paths::proof_path,
-    paths::repl_history,
-};
+use super::lurk_proof::LurkProof;
 
 #[derive(Completer, Helper, Highlighter, Hinter)]
 struct InputValidator {
@@ -141,6 +124,7 @@ fn pad(a: usize, m: usize) -> usize {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn timestamp() -> u128 {
+    use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("We're after UNIX_EPOCH")
@@ -175,6 +159,15 @@ impl Repl<F> {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn prove_last_frames(&mut self) -> Result<()> {
+        use super::{
+            lurk_proof::{NovaProof, ProofInfo},
+            paths::proof_path,
+        };
+        use lurk::{
+            proof::{nova::NovaProver, Prover},
+            public_parameters::public_params,
+        };
+        use std::{fs::File, io::BufWriter, time::Instant};
         match &self.frames {
             None => bail!("No computation to prove"),
             Some(frames) => match self.backend {
@@ -560,7 +553,7 @@ impl Repl<F> {
         }));
 
         #[cfg(not(target_arch = "wasm32"))]
-        let history_path = &repl_history();
+        let history_path = &crate::cli::paths::repl_history();
 
         #[cfg(not(target_arch = "wasm32"))]
         if history_path.exists() {

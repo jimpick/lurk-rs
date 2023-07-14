@@ -15,9 +15,6 @@ use lurk::{
 #[cfg(not(target_arch = "wasm32"))]
 use lurk::{proof::nova::PublicParams, public_parameters::public_params};
 
-#[cfg(not(target_arch = "wasm32"))]
-use super::paths::proof_path;
-
 type F = pasta_curves::pallas::Scalar;
 
 #[derive(Serialize, Deserialize)]
@@ -66,6 +63,7 @@ pub enum LurkProof<'a> {
 impl<'a> LurkProof<'a> {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn verify_proof(proof_id: &str) -> Result<()> {
+        use super::paths::proof_path;
         use crate::cli::repl::Backend;
         use log::info;
         use std::{fs::File, io::BufReader, sync::Arc};
