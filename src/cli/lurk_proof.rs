@@ -1,11 +1,15 @@
 use serde::{Deserialize, Serialize};
 
+#[cfg(not(target_arch = "wasm32"))]
 use anyhow::Result;
 
 use lurk::{
     eval::lang::{Coproc, Lang},
-    proof::{nova, nova::PublicParams},
+    proof::nova,
 };
+
+#[cfg(not(target_arch = "wasm32"))]
+use lurk::proof::nova::PublicParams;
 
 type F = pasta_curves::pallas::Scalar;
 
@@ -18,6 +22,7 @@ pub struct NovaProof<'a> {
 }
 
 impl<'a> NovaProof<'a> {
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn verify(&self, pp: &PublicParams<'_, Coproc<F>>) -> Result<bool> {
         let Self {
             proof,
@@ -62,6 +67,7 @@ pub enum LurkProof<'a> {
 
 impl<'a> LurkProof<'a> {
     #[inline]
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn new_nova(proof: NovaProof<'a>, info: LurkProofInfo, meta: LurkProofMeta) -> Self {
         Self::Nova { proof, info, meta }
     }

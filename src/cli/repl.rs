@@ -1,13 +1,22 @@
-use std::fs::File;
-use std::io::{BufReader, BufWriter};
 use std::path::Path;
 use std::sync::Arc;
+
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
+
 use std::{fs::read_to_string, process};
+
+#[cfg(not(target_arch = "wasm32"))]
+use std::{
+    fs::File,
+    io::{BufReader, BufWriter},
+};
 
 use anyhow::{bail, Context, Result};
 
+#[cfg(not(target_arch = "wasm32"))]
 use log::info;
+
 use rustyline::{
     error::ReadlineError,
     history::DefaultHistory,
@@ -23,22 +32,25 @@ use lurk::{
     },
     field::LurkField,
     parser,
-    proof::{nova::NovaProver, Prover},
     ptr::Ptr,
-    public_parameters::public_params,
     store::Store,
     tag::{ContTag, ExprTag},
     writer::Write,
     Num, UInt,
 };
 
-use super::{
-    lurk_proof::{LurkProof, LurkProofInfo, LurkProofMeta, NovaProof},
-    paths::proof_path,
+#[cfg(not(target_arch = "wasm32"))]
+use lurk::{
+    proof::{nova::NovaProver, Prover},
+    public_parameters::public_params,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
-use crate::cli::paths::repl_history;
+use super::{
+    lurk_proof::{LurkProof, LurkProofInfo, LurkProofMeta, NovaProof},
+    paths::proof_path,
+    paths::repl_history,
+};
 
 #[derive(Completer, Helper, Highlighter, Hinter)]
 struct InputValidator {
@@ -58,6 +70,7 @@ pub enum Backend {
 
 type FrameVec<F> = Vec<Frame<IO<F>, Witness<F>, Coproc<F>>>;
 
+#[allow(dead_code)]
 pub struct Repl<F: LurkField> {
     store: Store<F>,
     env: Ptr<F>,
@@ -78,6 +91,7 @@ fn check_non_zero(name: &str, x: usize) -> Result<()> {
 /// `pad(a, m)` returns the first multiple of `m` that's equal or greater than `a`
 ///
 /// Panics if `m` is zero
+#[cfg(not(target_arch = "wasm32"))]
 fn pad(a: usize, m: usize) -> usize {
     let lower = m * (a / m);
     if lower < a {
@@ -87,6 +101,7 @@ fn pad(a: usize, m: usize) -> usize {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn timestamp() -> u128 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -96,6 +111,7 @@ fn timestamp() -> u128 {
 
 type F = pasta_curves::pallas::Scalar;
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn verify_proof(proof_id: &str) -> Result<()> {
     let file = File::open(proof_path(proof_id))?;
     let reader = BufReader::new(file);
@@ -141,6 +157,7 @@ impl Repl<F> {
         })
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn prove_last_frames(&mut self) -> Result<()> {
         match &self.last_frames {
             None => bail!("No computation to prove"),
@@ -393,17 +410,21 @@ impl Repl<F> {
                 if !args.is_nil() {
                     self.eval_expr_and_set_last_frames(self.peek1(cmd, args)?)?;
                 }
+                #[cfg(not(target_arch = "wasm32"))]
                 self.prove_last_frames()?;
             }
             "verify" => {
-                let first = self.peek1(cmd, args)?;
-                match self.store.fetch_string(&first) {
-                    None => bail!(
-                        "Proof ID {} not parsed as a string",
-                        first.fmt_to_string(&self.store)
-                    ),
-                    Some(proof_id) => {
-                        verify_proof(&proof_id)?;
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    let first = self.peek1(cmd, args)?;
+                    match self.store.fetch_string(&first) {
+                        None => bail!(
+                            "Proof ID {} not parsed as a string",
+                            first.fmt_to_string(&self.store)
+                        ),
+                        Some(proof_id) => {
+                            verify_proof(&proof_id)?;
+                        }
                     }
                 }
             }
