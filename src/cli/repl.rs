@@ -109,10 +109,8 @@ fn timestamp() -> u128 {
         .as_nanos()
 }
 
-type F = pasta_curves::pallas::Scalar;
-
 #[cfg(not(target_arch = "wasm32"))]
-pub fn verify_proof(proof_id: &str) -> Result<()> {
+pub fn verify_proof<F: LurkField>(proof_id: &str) -> Result<()> {
     let file = File::open(proof_path(proof_id))?;
     let reader = BufReader::new(file);
     let lurk_proof: LurkProof = bincode::deserialize_from(reader)?;
@@ -121,6 +119,14 @@ pub fn verify_proof(proof_id: &str) -> Result<()> {
             nova_proof,
             proof_info,
         } => {
+            if proof_info.field != F::FIELD {
+                bail!(
+                    "Proof was generated in {} but the verifier is using {}",
+                    &proof_info.field,
+                    F::FIELD
+                );
+            }
+
             info!("Loading public parameters");
             let pp = public_params(proof_info.rc, Arc::new(proof_info.lang))?;
 
@@ -133,6 +139,8 @@ pub fn verify_proof(proof_id: &str) -> Result<()> {
     }
     Ok(())
 }
+
+type F = pasta_curves::pallas::Scalar; // TODO: generalize this
 
 impl Repl<F> {
     pub fn new(
@@ -203,6 +211,7 @@ impl Repl<F> {
                             num_steps,
                         },
                         proof_info: ProofInfo {
+                            field: F::FIELD,
                             rc: self.rc,
                             lang: (*self.lang).clone(),
                             iterations,
@@ -426,7 +435,7 @@ impl Repl<F> {
                             first.fmt_to_string(&self.store)
                         ),
                         Some(proof_id) => {
-                            verify_proof(&proof_id)?;
+                            verify_proof::<F>(&proof_id)?;
                         }
                     }
                 }

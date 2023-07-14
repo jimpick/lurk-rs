@@ -8,6 +8,7 @@ use lurk::{
         lang::{Coproc, Lang},
         Status,
     },
+    field::LanguageField,
     proof::nova,
 };
 
@@ -18,6 +19,7 @@ type F = pasta_curves::pallas::Scalar;
 
 #[derive(Serialize, Deserialize)]
 pub struct ProofInfo {
+    pub field: LanguageField,
     pub rc: usize,
     pub lang: Lang<F, Coproc<F>>,
     pub iterations: usize,

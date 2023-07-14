@@ -342,6 +342,10 @@ struct VerifyArgs {
     /// ID of the proof to be verified
     #[clap(value_parser)]
     proof_id: String,
+
+    /// Arithmetic field (defaults to "pallas")
+    #[clap(long, value_parser)]
+    field: Option<String>,
 }
 
 /// Parses CLI arguments and continues the program flow accordingly
@@ -360,7 +364,23 @@ pub fn parse_and_run() -> Result<()> {
             #[allow(unused_variables)]
             Command::Verify(verify_args) => {
                 #[cfg(not(target_arch = "wasm32"))]
-                verify_proof(&verify_args.proof_id)?;
+                {
+                    use pasta_curves::vesta;
+                    match verify_args.field {
+                        None => verify_proof::<pallas::Scalar>(&verify_args.proof_id),
+                        Some(field_str) => match parse_field(&field_str)? {
+                            LanguageField::Pallas => {
+                                verify_proof::<pallas::Scalar>(&verify_args.proof_id)
+                            }
+                            LanguageField::Vesta => {
+                                verify_proof::<vesta::Scalar>(&verify_args.proof_id)
+                            }
+                            LanguageField::BLS12_381 => {
+                                verify_proof::<blstrs::Scalar>(&verify_args.proof_id)
+                            }
+                        },
+                    }?;
+                }
                 Ok(())
             }
         }

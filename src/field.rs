@@ -26,6 +26,7 @@ use crate::tag::{ContTag, ExprTag, Op1, Op2};
 /// Because confusion on this point, perhaps combined with cargo-cult copying of incorrect previous usage has led to
 /// inconsistencies and inaccuracies in the code base, please prefer the named Scalar forms when correspondence to a
 /// named `LanguageField` is important.
+#[derive(Serialize, Deserialize, PartialEq)]
 pub enum LanguageField {
     /// The Pallas field,
     Pallas,
@@ -33,6 +34,16 @@ pub enum LanguageField {
     Vesta,
     /// The BLS12-381 scalar field,
     BLS12_381,
+}
+
+impl std::fmt::Display for LanguageField {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Pallas => write!(f, "Pallas"),
+            Self::Vesta => write!(f, "Vesta"),
+            Self::BLS12_381 => write!(f, "BLS12-381"),
+        }
+    }
 }
 
 /// Trait implemented by finite fields used in the language
