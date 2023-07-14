@@ -17,12 +17,8 @@ use lurk::{
 
 use self::repl::{Backend, Repl};
 
-#[cfg(not(target_arch = "wasm32"))]
-use self::repl::verify_proof;
-
 const DEFAULT_LIMIT: usize = 100_000_000;
 const DEFAULT_RC: usize = 10;
-const DEFAULT_FIELD: LanguageField = LanguageField::Pallas;
 const DEFAULT_BACKEND: Backend = Backend::Nova;
 
 #[derive(Parser, Debug)]
@@ -68,13 +64,13 @@ struct LoadArgs {
     #[clap(long, value_parser)]
     rc: Option<usize>,
 
-    /// Arithmetic field (defaults to "pallas")
-    #[clap(long, value_parser)]
-    field: Option<String>,
-
-    /// Prover backend (defaults to "nova")
+    /// Prover backend (defaults to "Nova")
     #[clap(long, value_parser)]
     backend: Option<String>,
+
+    /// Arithmetic field (defaults to the backend's standard field)
+    #[clap(long, value_parser)]
+    field: Option<String>,
 }
 
 #[derive(Parser, Debug)]
@@ -98,10 +94,10 @@ struct LoadCli {
     rc: Option<usize>,
 
     #[clap(long, value_parser)]
-    field: Option<String>,
+    backend: Option<String>,
 
     #[clap(long, value_parser)]
-    backend: Option<String>,
+    field: Option<String>,
 }
 
 impl LoadArgs {
@@ -113,8 +109,8 @@ impl LoadArgs {
             config: self.config,
             limit: self.limit,
             rc: self.rc,
-            field: self.field,
             backend: self.backend,
+            field: self.field,
         }
     }
 }
@@ -141,13 +137,13 @@ struct ReplArgs {
     #[clap(long, value_parser)]
     rc: Option<usize>,
 
-    /// Arithmetic field (defaults to "pallas")
-    #[clap(long, value_parser)]
-    field: Option<String>,
-
-    /// Prover backend (defaults to "nova")
+    /// Prover backend (defaults to "Nova")
     #[clap(long, value_parser)]
     backend: Option<String>,
+
+    /// Arithmetic field (defaults to the backend's standard field)
+    #[clap(long, value_parser)]
+    field: Option<String>,
 }
 
 #[derive(Parser, Debug)]
@@ -168,10 +164,10 @@ struct ReplCli {
     rc: Option<usize>,
 
     #[clap(long, value_parser)]
-    field: Option<String>,
+    backend: Option<String>,
 
     #[clap(long, value_parser)]
-    backend: Option<String>,
+    field: Option<String>,
 }
 
 impl ReplArgs {
@@ -182,9 +178,17 @@ impl ReplArgs {
             config: self.config,
             limit: self.limit,
             rc: self.rc,
-            field: self.field,
             backend: self.backend,
+            field: self.field,
         }
+    }
+}
+
+fn parse_backend(backend_str: &String) -> Result<Backend> {
+    match backend_str.to_lowercase().as_str() {
+        "nova" => Ok(Backend::Nova),
+        "snarkpack+" => Ok(Backend::SnarkPackPlus),
+        _ => bail!("Backend not supported: {backend_str}"),
     }
 }
 
@@ -194,14 +198,6 @@ fn parse_field(field_str: &String) -> Result<LanguageField> {
         "vesta" => Ok(LanguageField::Vesta),
         "bls12-381" => Ok(LanguageField::BLS12_381),
         _ => bail!("Field not supported: {field_str}"),
-    }
-}
-
-fn parse_backend(backend_str: &String) -> Result<Backend> {
-    match backend_str.to_lowercase().as_str() {
-        "nova" => Ok(Backend::Nova),
-        "groth16" => Ok(Backend::Groth16),
-        _ => bail!("Backend not supported: {backend_str}"),
     }
 }
 
@@ -283,13 +279,19 @@ impl ReplCli {
         let config = get_config(&self.config)?;
         let limit = get_parsed_usize("limit", &self.limit, &config, DEFAULT_LIMIT)?;
         let rc = get_parsed_usize("rc", &self.rc, &config, DEFAULT_RC)?;
-        let field = get_parsed("field", &self.field, &config, parse_field, DEFAULT_FIELD)?;
         let backend = get_parsed(
             "backend",
             &self.backend,
             &config,
             parse_backend,
             DEFAULT_BACKEND,
+        )?;
+        let field = get_parsed(
+            "field",
+            &self.field,
+            &config,
+            parse_field,
+            backend.default_field(),
         )?;
         match field {
             LanguageField::Pallas => repl!(limit, rc, pallas::Scalar, backend),
@@ -317,13 +319,19 @@ impl LoadCli {
         let config = get_config(&self.config)?;
         let limit = get_parsed_usize("limit", &self.limit, &config, DEFAULT_LIMIT)?;
         let rc = get_parsed_usize("rc", &self.rc, &config, DEFAULT_RC)?;
-        let field = get_parsed("field", &self.field, &config, parse_field, DEFAULT_FIELD)?;
         let backend = get_parsed(
             "backend",
             &self.backend,
             &config,
             parse_backend,
             DEFAULT_BACKEND,
+        )?;
+        let field = get_parsed(
+            "field",
+            &self.field,
+            &config,
+            parse_field,
+            backend.default_field(),
         )?;
         match field {
             LanguageField::Pallas => load!(limit, rc, pallas::Scalar, backend),
@@ -340,10 +348,6 @@ struct VerifyArgs {
     /// ID of the proof to be verified
     #[clap(value_parser)]
     proof_id: String,
-
-    /// Arithmetic field (defaults to "pallas")
-    #[clap(long, value_parser)]
-    field: Option<String>,
 }
 
 /// Parses CLI arguments and continues the program flow accordingly
@@ -363,21 +367,8 @@ pub fn parse_and_run() -> Result<()> {
             Command::Verify(verify_args) => {
                 #[cfg(not(target_arch = "wasm32"))]
                 {
-                    use pasta_curves::vesta;
-                    match verify_args.field {
-                        None => verify_proof::<pallas::Scalar>(&verify_args.proof_id),
-                        Some(field_str) => match parse_field(&field_str)? {
-                            LanguageField::Pallas => {
-                                verify_proof::<pallas::Scalar>(&verify_args.proof_id)
-                            }
-                            LanguageField::Vesta => {
-                                verify_proof::<vesta::Scalar>(&verify_args.proof_id)
-                            }
-                            LanguageField::BLS12_381 => {
-                                verify_proof::<blstrs::Scalar>(&verify_args.proof_id)
-                            }
-                        },
-                    }?;
+                    use crate::cli::lurk_proof::LurkProof;
+                    LurkProof::verify_proof(&verify_args.proof_id)?;
                 }
                 Ok(())
             }

@@ -13,7 +13,10 @@ use lurk::{
 };
 
 #[cfg(not(target_arch = "wasm32"))]
-use lurk::proof::nova::PublicParams;
+use lurk::{proof::nova::PublicParams, public_parameters::public_params};
+
+#[cfg(not(target_arch = "wasm32"))]
+use super::paths::proof_path;
 
 type F = pasta_curves::pallas::Scalar;
 
@@ -58,4 +61,35 @@ pub enum LurkProof<'a> {
         nova_proof: NovaProof<'a>,
         proof_info: ProofInfo,
     },
+}
+
+impl<'a> LurkProof<'a> {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn verify_proof(proof_id: &str) -> Result<()> {
+        use crate::cli::repl::Backend;
+        use log::info;
+        use std::{fs::File, io::BufReader, sync::Arc};
+
+        let file = File::open(proof_path(proof_id))?;
+        let reader = BufReader::new(file);
+        let lurk_proof: LurkProof = bincode::deserialize_from(reader)?;
+        match lurk_proof {
+            LurkProof::Nova {
+                nova_proof,
+                proof_info,
+            } => {
+                Backend::Nova.validate_field(&proof_info.field)?;
+
+                info!("Loading public parameters");
+                let pp = public_params(proof_info.rc, Arc::new(proof_info.lang))?;
+
+                if nova_proof.verify(&pp)? {
+                    println!("✓ Proof {proof_id} verified");
+                } else {
+                    println!("✗ Proof {proof_id} failed on verification");
+                }
+            }
+        }
+        Ok(())
+    }
 }

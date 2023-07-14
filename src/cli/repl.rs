@@ -6,13 +6,12 @@ use std::{fs::read_to_string, process};
 #[cfg(not(target_arch = "wasm32"))]
 use std::{
     fs::File,
-    io::{BufReader, BufWriter},
+    io::BufWriter,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
 use anyhow::{bail, Context, Result};
 
-#[cfg(not(target_arch = "wasm32"))]
 use log::info;
 
 use rustyline::{
@@ -28,7 +27,7 @@ use lurk::{
         lang::{Coproc, Lang},
         Evaluator, Frame, Witness, IO,
     },
-    field::LurkField,
+    field::{LanguageField, LurkField},
     parser,
     ptr::Ptr,
     store::Store,
@@ -63,7 +62,48 @@ impl Validator for InputValidator {
 
 pub enum Backend {
     Nova,
-    Groth16,
+    SnarkPackPlus,
+}
+
+impl std::fmt::Display for Backend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Nova => write!(f, "Nova"),
+            Self::SnarkPackPlus => write!(f, "SnarkPack+"),
+        }
+    }
+}
+
+impl Backend {
+    pub fn default_field(&self) -> LanguageField {
+        match self {
+            Self::Nova => LanguageField::Pallas,
+            Self::SnarkPackPlus => LanguageField::BLS12_381,
+        }
+    }
+
+    fn compatible_fields(&self) -> Vec<LanguageField> {
+        use LanguageField::*;
+        match self {
+            Self::Nova => vec![Pallas, Vesta],
+            Self::SnarkPackPlus => vec![BLS12_381],
+        }
+    }
+
+    pub fn validate_field(&self, field: &LanguageField) -> Result<()> {
+        let compatible_fields = self.compatible_fields();
+        if !compatible_fields.contains(field) {
+            bail!(
+                "Backend {self} is incompatible with field {field}. Compatible fields are:\n  {}",
+                compatible_fields
+                    .iter()
+                    .map(|f| f.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        }
+        Ok(())
+    }
 }
 
 type FrameVec<F> = Vec<Frame<IO<F>, Witness<F>, Coproc<F>>>;
@@ -79,7 +119,7 @@ pub struct Repl<F: LurkField> {
     frames: Option<FrameVec<F>>,
 }
 
-fn check_non_zero(name: &str, x: usize) -> Result<()> {
+fn validate_non_zero(name: &str, x: usize) -> Result<()> {
     if x == 0 {
         bail!("`{name}` can't be zero")
     }
@@ -107,37 +147,6 @@ fn timestamp() -> u128 {
         .as_nanos()
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-pub fn verify_proof<F: LurkField>(proof_id: &str) -> Result<()> {
-    let file = File::open(proof_path(proof_id))?;
-    let reader = BufReader::new(file);
-    let lurk_proof: LurkProof = bincode::deserialize_from(reader)?;
-    match lurk_proof {
-        LurkProof::Nova {
-            nova_proof,
-            proof_info,
-        } => {
-            if proof_info.field != F::FIELD {
-                bail!(
-                    "Proof was generated in {} but the verifier is using {}",
-                    &proof_info.field,
-                    F::FIELD
-                );
-            }
-
-            info!("Loading public parameters");
-            let pp = public_params(proof_info.rc, Arc::new(proof_info.lang))?;
-
-            if nova_proof.verify(&pp)? {
-                println!("✓ Proof {proof_id} verified");
-            } else {
-                println!("✗ Proof {proof_id} failed on verification");
-            }
-        }
-    }
-    Ok(())
-}
-
 type F = pasta_curves::pallas::Scalar; // TODO: generalize this
 
 impl Repl<F> {
@@ -148,8 +157,11 @@ impl Repl<F> {
         rc: usize,
         backend: Backend,
     ) -> Result<Repl<F>> {
-        check_non_zero("limit", limit)?;
-        check_non_zero("rc", rc)?;
+        validate_non_zero("limit", limit)?;
+        validate_non_zero("rc", rc)?;
+        let field = F::FIELD;
+        backend.validate_field(&field)?;
+        info!("Launching REPL with backend {backend} and field {field}");
         Ok(Repl {
             store,
             env,
@@ -228,7 +240,7 @@ impl Repl<F> {
                     println!("Proof ID: {name}");
                     Ok(())
                 }
-                Backend::Groth16 => todo!(),
+                Backend::SnarkPackPlus => todo!(),
             },
         }
     }
@@ -408,12 +420,12 @@ impl Repl<F> {
             }
             "set-limit" => {
                 let limit = self.peek_usize(cmd, args)?;
-                check_non_zero("limit", limit)?;
+                validate_non_zero("limit", limit)?;
                 self.limit = limit;
             }
             "set-rc" => {
                 let rc = self.peek_usize(cmd, args)?;
-                check_non_zero("rc", rc)?;
+                validate_non_zero("rc", rc)?;
                 self.rc = rc;
             }
             "prove" => {
@@ -433,7 +445,7 @@ impl Repl<F> {
                             first.fmt_to_string(&self.store)
                         ),
                         Some(proof_id) => {
-                            verify_proof::<F>(&proof_id)?;
+                            LurkProof::verify_proof(&proof_id)?;
                         }
                     }
                 }
