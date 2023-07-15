@@ -149,13 +149,13 @@ impl<C: Coprocessor<S1>> NovaProver<S1, C> {
     pub fn prove<'a>(
         &'a self,
         pp: &'a PublicParams<'_, C>,
-        frames: Vec<Frame<IO<S1>, Witness<S1>, C>>,
+        frames: &[Frame<IO<S1>, Witness<S1>, C>],
         store: &'a mut Store<S1>,
         lang: Arc<Lang<S1, C>>,
     ) -> Result<(Proof<'_, C>, Vec<S1>, Vec<S1>, usize), ProofError> {
         let z0 = frames[0].input.to_vector(store)?;
         let zi = frames.last().unwrap().output.to_vector(store)?;
-        let circuits = MultiFrame::from_frames(self.reduction_count(), &frames, store, &lang);
+        let circuits = MultiFrame::from_frames(self.reduction_count(), frames, store, &lang);
         let num_steps = circuits.len();
         let proof =
             Proof::prove_recursively(pp, store, &circuits, self.reduction_count, z0.clone(), lang)?;
@@ -174,7 +174,7 @@ impl<C: Coprocessor<S1>> NovaProver<S1, C> {
         lang: Arc<Lang<S1, C>>,
     ) -> Result<(Proof<'_, C>, Vec<S1>, Vec<S1>, usize), ProofError> {
         let frames = self.get_evaluation_frames(expr, env, store, limit, &lang)?;
-        self.prove(pp, frames, store, lang)
+        self.prove(pp, &frames, store, lang)
     }
 }
 

@@ -74,9 +74,9 @@ impl<'a> LurkProof<'a> {
                 let pp = public_params(rc, Arc::new(lang))?;
 
                 if proof.verify(&pp, num_steps, &public_inputs, &public_outputs)? {
-                    println!("✓ Proof {proof_id} verified");
+                    println!("✓ Proof \"{proof_id}\" verified");
                 } else {
-                    println!("✗ Proof {proof_id} failed on verification");
+                    println!("✗ Proof \"{proof_id}\" failed on verification");
                 }
             }
         }

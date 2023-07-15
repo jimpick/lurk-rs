@@ -166,7 +166,7 @@ impl Repl<F> {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn prove_last_frames(&mut self) -> Result<()> {
-        match &self.evaluation {
+        match self.evaluation.as_mut() {
             None => bail!("No evaluation to prove"),
             Some(Evaluation {
                 frames,
@@ -175,7 +175,6 @@ impl Repl<F> {
             }) => match self.backend {
                 Backend::Nova => {
                     // padding the frames
-                    let mut frames = frames.clone(); // don't mutate memoized frames
                     let n_frames = frames.len();
                     frames.extend(vec![
                         frames.last().cloned().expect("frames is empty!");
@@ -240,7 +239,7 @@ impl Repl<F> {
                     let proof_meta_file = File::create(proof_meta_path(id))?;
                     bincode::serialize_into(BufWriter::new(&proof_file), &lurk_proof)?;
                     bincode::serialize_into(BufWriter::new(&proof_meta_file), &lurk_proof_meta)?;
-                    println!("Proof ID: {id}");
+                    println!("Proof ID: \"{id}\"");
                     Ok(())
                 }
                 Backend::SnarkPackPlus => todo!(),
