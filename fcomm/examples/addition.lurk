@@ -1,0 +1,2 @@
+;; (FIB TARGET) computes the element of the Fibonacci sequence at TARGET (zero-indexed).
+(+ 2 3)

@@ -47,3 +47,15 @@ chained2-opening chained2-opening.json : chained-input.lurk chained-opening
 
 chained2-from_req-opening chained2-from_req-opening.json : chained2-opening chained-request.json
 	cargo run --release open --request chained-request.json --proof chained2-from_req-opening.json
+
+eval-addition :
+	cargo run --release -- eval --expression addition.lurk --lurk
+
+addition-claim.json : addition.lurk
+	cargo run --release -- eval --expression addition.lurk --claim addition-claim.json --lurk
+
+addition-proof addition-proof.json : addition.lurk
+	cargo run --release -- prove --expression addition.lurk --proof addition-proof.json --lurk
+
+addition2-proof addition2-proof.json : addition-claim.json
+	cargo run --release -- prove --claim addition-claim.json --proof addition-proof.json
