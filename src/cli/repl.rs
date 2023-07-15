@@ -174,13 +174,13 @@ impl Repl<F> {
                 cost,
             }) => match self.backend {
                 Backend::Nova => {
-                    // padding the frames
-                    let n_frames = frames.len();
-                    frames.extend(vec![
-                        frames.last().cloned().expect("frames is empty!");
-                        pad(n_frames, self.rc) - n_frames
-                    ]);
-                    let n_frames = frames.len();
+                    // padding the frames, if needed
+                    let mut n_frames = frames.len();
+                    let n_pad = pad(n_frames, self.rc) - n_frames;
+                    if n_pad != 0 {
+                        frames.extend(vec![frames[n_frames - 1].clone(); n_pad]);
+                        n_frames = frames.len();
+                    }
 
                     let prover = NovaProver::new(self.rc, (*self.lang).clone());
 
