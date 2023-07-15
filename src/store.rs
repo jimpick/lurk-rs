@@ -943,9 +943,9 @@ impl<F: LurkField> Store<F> {
     pub fn get_z_expr(
         &self,
         ptr: &Ptr<F>,
-        z_store: &mut Option<&mut ZStore<F>>,
+        z_store: &mut Option<ZStore<F>>,
     ) -> Result<(ZExprPtr<F>, Option<ZExpr<F>>), Error> {
-        let get_z_expr_aux = |z_store: &mut Option<&mut ZStore<F>>| {
+        let get_z_expr_aux = |z_store: &mut Option<ZStore<F>>| {
             let (z_ptr, z_expr) = match self.fetch(ptr) {
                 Some(Expression::Nil) => (ZExpr::Nil.z_ptr(&self.poseidon_cache), Some(ZExpr::Nil)),
                 Some(Expression::Cons(car, cdr)) => {
@@ -1036,21 +1036,19 @@ impl<F: LurkField> Store<F> {
             // TODO: should we try to dereference the opaque pointer?
             Ok((*z_ptr, None))
         } else {
-            match z_store {
-                Some(z_store) => {
-                    // Store all children reachable from Ptr in ZStore
-                    let (z_ptr, z_expr) = get_z_expr_aux(&mut Some(z_store))?;
-                    z_store.insert_z_expr(&z_ptr, z_expr.clone());
-                    Ok((z_ptr, z_expr))
-                }
-                None => {
-                    // Check the Ptr cache, used extensively in hydration
-                    if let Some((z_ptr, z_expr)) = self.z_expr_ptr_cache.get(ptr) {
-                        Ok((*z_ptr, z_expr.clone()))
-                    } else {
-                        get_z_expr_aux(z_store)
-                    }
-                }
+            // Store all children reachable from Ptr in ZStore
+            if z_store.is_some() {
+                let (z_ptr, z_expr) = get_z_expr_aux(z_store)?;
+                z_store
+                    .as_mut()
+                    .unwrap()
+                    .insert_z_expr(&z_ptr, z_expr.clone());
+                Ok((z_ptr, z_expr))
+            // Check the Ptr cache, used extensively in hydration
+            } else if let Some((z_ptr, z_expr)) = self.z_expr_ptr_cache.get(ptr) {
+                Ok((*z_ptr, z_expr.clone()))
+            } else {
+                get_z_expr_aux(z_store)
             }
         }
     }
@@ -1059,7 +1057,7 @@ impl<F: LurkField> Store<F> {
     pub fn get_z_cont(
         &self,
         ptr: &ContPtr<F>,
-        z_store: &mut Option<&mut ZStore<F>>,
+        z_store: &mut Option<ZStore<F>>,
     ) -> Result<(ZContPtr<F>, Option<ZCont<F>>), Error> {
         if let Some(idx) = ptr.raw.opaque_idx() {
             let z_ptr = self
@@ -1284,9 +1282,10 @@ impl<F: LurkField> Store<F> {
     }
 
     pub fn to_z_store_with_ptr(&self, ptr: &Ptr<F>) -> Result<(ZStore<F>, ZExprPtr<F>), Error> {
-        let mut z_store = ZStore::new();
-        let (z_ptr, _) = self.get_z_expr(ptr, &mut Some(&mut z_store))?;
-        Ok((z_store, z_ptr))
+        let z_store = ZStore::new();
+        let mut store_opt = Some(z_store);
+        let (z_ptr, _) = self.get_z_expr(ptr, &mut store_opt)?;
+        Ok((store_opt.unwrap(), z_ptr))
     }
 
     pub fn to_z_expr(&self, ptr: &Ptr<F>) -> Option<ZExpr<F>> {

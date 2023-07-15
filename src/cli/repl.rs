@@ -191,16 +191,10 @@ impl Repl<F> {
                     let input = &frames[0].input;
                     let output = &frames[iterations].output;
                     let status = output.cont.into();
-                    let mut zstore = ZStore::default();
-                    let expression = self
-                        .store
-                        .get_z_expr(&input.expr, &mut Some(&mut zstore))?
-                        .0;
-                    let environment = self.store.get_z_expr(&input.env, &mut Some(&mut zstore))?.0;
-                    let result = self
-                        .store
-                        .get_z_expr(&output.expr, &mut Some(&mut zstore))?
-                        .0;
+                    let mut zstore = Some(ZStore::<F>::default());
+                    let expression = self.store.get_z_expr(&input.expr, &mut zstore)?.0;
+                    let environment = self.store.get_z_expr(&input.env, &mut zstore)?.0;
+                    let result = self.store.get_z_expr(&output.expr, &mut zstore)?.0;
 
                     info!("Proving and compressing");
                     let start = Instant::now();
@@ -234,7 +228,7 @@ impl Repl<F> {
                         expression,
                         environment,
                         result,
-                        zstore,
+                        zstore: zstore.unwrap(),
                     };
 
                     let id = &format!("{}", timestamp());
