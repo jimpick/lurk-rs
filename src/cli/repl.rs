@@ -105,6 +105,7 @@ impl Backend {
 #[allow(dead_code)]
 struct Evaluation<F: LurkField> {
     frames: Vec<Frame<IO<F>, Witness<F>, Coproc<F>>>,
+    iterations: usize,
     cost: u128,
 }
 
@@ -166,13 +167,16 @@ impl Repl<F> {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn prove_last_frames(&mut self) -> Result<()> {
         match &self.evaluation {
-            None => bail!("No computation to prove"),
-            Some(Evaluation { frames, cost }) => match self.backend {
+            None => bail!("No evaluation to prove"),
+            Some(Evaluation {
+                frames,
+                iterations,
+                cost,
+            }) => match self.backend {
                 Backend::Nova => {
                     // padding the frames
                     let mut frames = frames.clone(); // don't mutate memoized frames
                     let n_frames = frames.len();
-                    let iterations = n_frames - 1; // needs to be fixed for incomplete computations
                     frames.extend(vec![
                         frames.last().cloned().expect("frames is empty!");
                         pad(n_frames, self.rc) - n_frames
@@ -189,7 +193,7 @@ impl Repl<F> {
 
                     // saving to avoid clones
                     let input = &frames[0].input;
-                    let output = &frames[iterations].output;
+                    let output = &frames[*iterations].output;
                     let status = output.cont.into();
                     let mut zstore = Some(ZStore::<F>::default());
                     let expression = self.store.get_z_expr(&input.expr, &mut zstore)?.0;
@@ -220,7 +224,7 @@ impl Repl<F> {
 
                     let lurk_proof_meta: LurkProofMeta<F> = LurkProofMeta {
                         field,
-                        iterations,
+                        iterations: *iterations,
                         evaluation_cost: *cost,
                         generation_cost: generation.duration_since(start).as_nanos(),
                         compression_cost: compression.duration_since(generation).as_nanos(),
@@ -482,7 +486,11 @@ impl Repl<F> {
 
         // FIXME: proving is not working for incomplete computations
         if last_frame.is_complete() {
-            self.evaluation = Some(Evaluation { frames, cost })
+            self.evaluation = Some(Evaluation {
+                frames,
+                iterations,
+                cost,
+            })
         } else {
             iterations += 1;
         }
