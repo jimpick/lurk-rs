@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use std::{fs::read_to_string, process};
+use std::{fs::read_to_string, process, time::Instant};
 
 use anyhow::{bail, Context, Result};
 
@@ -89,7 +89,11 @@ impl Backend {
     }
 }
 
-type FrameVec<F> = Vec<Frame<IO<F>, Witness<F>, Coproc<F>>>;
+#[allow(dead_code)]
+struct Evaluation<F: LurkField> {
+    frames: Vec<Frame<IO<F>, Witness<F>, Coproc<F>>>,
+    cost: u128,
+}
 
 #[allow(dead_code)]
 pub struct Repl<F: LurkField> {
@@ -99,7 +103,7 @@ pub struct Repl<F: LurkField> {
     lang: Arc<Lang<F, Coproc<F>>>,
     rc: usize,
     backend: Backend,
-    frames: Option<FrameVec<F>>,
+    evaluation: Option<Evaluation<F>>,
 }
 
 fn validate_non_zero(name: &str, x: usize) -> Result<()> {
@@ -153,24 +157,25 @@ impl Repl<F> {
             lang: Arc::new(Lang::new()),
             rc,
             backend,
-            frames: None,
+            evaluation: None,
         })
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn prove_last_frames(&mut self) -> Result<()> {
         use super::{
-            lurk_proof::{NovaProof, ProofInfo},
-            paths::proof_path,
+            lurk_proof::LurkProofMeta,
+            paths::{proof_meta_path, proof_path},
         };
         use lurk::{
             proof::{nova::NovaProver, Prover},
             public_parameters::public_params,
+            z_store::ZStore,
         };
-        use std::{fs::File, io::BufWriter, time::Instant};
-        match &self.frames {
+        use std::{fs::File, io::BufWriter};
+        match &self.evaluation {
             None => bail!("No computation to prove"),
-            Some(frames) => match self.backend {
+            Some(Evaluation { frames, cost }) => match self.backend {
                 Backend::Nova => {
                     // padding the frames
                     let mut frames = frames.clone(); // don't mutate memoized frames
@@ -186,51 +191,65 @@ impl Repl<F> {
                     info!("Loading public parameters");
                     let pp = public_params(self.rc, self.lang.clone())?;
 
-                    // save before mutating the store
+                    info!("Hydrating the store");
+                    self.store.hydrate_scalar_cache();
+
+                    // saving to avoid clones
                     let input = &frames[0].input;
                     let output = &frames[iterations].output;
                     let status = output.cont.into();
-                    let expression = Some(input.expr.fmt_to_string(&self.store));
-                    let environment = Some(input.env.fmt_to_string(&self.store));
-                    let result = Some(output.expr.fmt_to_string(&self.store));
+                    let mut zstore = ZStore::default();
+                    let expression = self
+                        .store
+                        .get_z_expr(&input.expr, &mut Some(&mut zstore))?
+                        .0;
+                    let environment = self.store.get_z_expr(&input.env, &mut Some(&mut zstore))?.0;
+                    let result = self
+                        .store
+                        .get_z_expr(&output.expr, &mut Some(&mut zstore))?
+                        .0;
 
-                    info!("Hydrating the store");
-                    self.store.hydrate_scalar_cache();
                     info!("Proving and compressing");
                     let start = Instant::now();
-                    let (proof, z0, zi, num_steps) =
+                    let (proof, public_inputs, public_outputs, num_steps) =
                         prover.prove(&pp, frames, &mut self.store, self.lang.clone())?;
                     let generation = Instant::now();
                     let proof = proof.compress(&pp)?;
                     let compression = Instant::now();
                     assert_eq!(self.rc * num_steps, n_frames);
-                    assert!(proof.verify(&pp, num_steps, &z0, &zi)?);
+                    assert!(proof.verify(&pp, num_steps, &public_inputs, &public_outputs)?);
+
+                    let field = F::FIELD;
 
                     let lurk_proof = LurkProof::Nova {
-                        nova_proof: NovaProof {
-                            proof,
-                            public_inputs: z0,
-                            public_outputs: zi,
-                            num_steps,
-                        },
-                        proof_info: ProofInfo {
-                            field: F::FIELD,
-                            rc: self.rc,
-                            lang: (*self.lang).clone(),
-                            iterations,
-                            generation_cost: generation.duration_since(start).as_nanos(),
-                            compression_cost: compression.duration_since(generation).as_nanos(),
-                            status,
-                            expression,
-                            environment,
-                            result,
-                        },
+                        proof,
+                        public_inputs,
+                        public_outputs,
+                        num_steps,
+                        field,
+                        rc: self.rc,
+                        lang: (*self.lang).clone(),
                     };
 
-                    let name = &format!("{}", timestamp());
-                    let file = File::create(proof_path(name))?;
-                    bincode::serialize_into(BufWriter::new(&file), &lurk_proof)?;
-                    println!("Proof ID: {name}");
+                    let lurk_proof_meta: LurkProofMeta<F> = LurkProofMeta {
+                        field,
+                        iterations,
+                        evaluation_cost: *cost,
+                        generation_cost: generation.duration_since(start).as_nanos(),
+                        compression_cost: compression.duration_since(generation).as_nanos(),
+                        status,
+                        expression,
+                        environment,
+                        result,
+                        zstore,
+                    };
+
+                    let id = &format!("{}", timestamp());
+                    let proof_file = File::create(proof_path(id))?;
+                    let proof_meta_file = File::create(proof_meta_path(id))?;
+                    bincode::serialize_into(BufWriter::new(&proof_file), &lurk_proof)?;
+                    bincode::serialize_into(BufWriter::new(&proof_meta_file), &lurk_proof_meta)?;
+                    println!("Proof ID: {id}");
                     Ok(())
                 }
                 Backend::SnarkPackPlus => todo!(),
@@ -423,7 +442,7 @@ impl Repl<F> {
             }
             "prove" => {
                 if !args.is_nil() {
-                    self.eval_expr_and_memo_frames(self.peek1(cmd, args)?)?;
+                    self.eval_expr_and_memoize(self.peek1(cmd, args)?)?;
                 }
                 #[cfg(not(target_arch = "wasm32"))]
                 self.prove_last_frames()?;
@@ -462,9 +481,11 @@ impl Repl<F> {
         Ok(())
     }
 
-    fn eval_expr_and_memo_frames(&mut self, expr_ptr: Ptr<F>) -> Result<(IO<F>, usize)> {
+    fn eval_expr_and_memoize(&mut self, expr_ptr: Ptr<F>) -> Result<(IO<F>, usize)> {
+        let start = Instant::now();
         let frames = Evaluator::new(expr_ptr, self.env, &mut self.store, self.limit, &self.lang)
             .get_frames()?;
+        let cost = Instant::now().duration_since(start).as_nanos();
 
         let last_idx = frames.len() - 1;
         let last_frame = &frames[last_idx];
@@ -474,7 +495,7 @@ impl Repl<F> {
 
         // FIXME: proving is not working for incomplete computations
         if last_frame.is_complete() {
-            self.frames = Some(frames)
+            self.evaluation = Some(Evaluation { frames, cost })
         } else {
             iterations += 1;
         }
@@ -483,7 +504,7 @@ impl Repl<F> {
     }
 
     fn handle_non_meta(&mut self, expr_ptr: Ptr<F>) -> Result<()> {
-        self.eval_expr_and_memo_frames(expr_ptr)
+        self.eval_expr_and_memoize(expr_ptr)
             .map(|(output, iterations)| {
                 let prefix = if iterations != 1 {
                     format!("[{iterations} iterations] => ")

@@ -8,56 +8,44 @@ use lurk::{
         lang::{Coproc, Lang},
         Status,
     },
-    field::LanguageField,
+    field::{LanguageField, LurkField},
     proof::nova,
+    z_ptr::ZExprPtr,
+    z_store::ZStore,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
-use lurk::{proof::nova::PublicParams, public_parameters::public_params};
+use lurk::public_parameters::public_params;
 
-type F = pasta_curves::pallas::Scalar;
+type F = pasta_curves::pallas::Scalar; // TODO: generalize this
 
-#[derive(Serialize, Deserialize)]
-pub struct ProofInfo {
-    pub field: LanguageField,
-    pub rc: usize,
-    pub lang: Lang<F, Coproc<F>>,
-    pub iterations: usize,
-    pub generation_cost: u128,
-    pub compression_cost: u128,
-    pub status: Status,
-    pub expression: Option<String>,
-    pub environment: Option<String>,
-    pub result: Option<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct NovaProof<'a> {
-    pub proof: nova::Proof<'a, Coproc<F>>,
-    pub public_inputs: Vec<F>,
-    pub public_outputs: Vec<F>,
-    pub num_steps: usize,
-}
-
-impl<'a> NovaProof<'a> {
-    #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) fn verify(&self, pp: &PublicParams<'_, Coproc<F>>) -> Result<bool> {
-        let Self {
-            proof,
-            public_inputs,
-            public_outputs,
-            num_steps,
-        } = self;
-        Ok(proof.verify(pp, *num_steps, public_inputs, public_outputs)?)
-    }
-}
-
+/// Minimal data structure containing just enough for proof verification
 #[derive(Serialize, Deserialize)]
 pub enum LurkProof<'a> {
     Nova {
-        nova_proof: NovaProof<'a>,
-        proof_info: ProofInfo,
+        proof: nova::Proof<'a, Coproc<F>>,
+        public_inputs: Vec<F>,
+        public_outputs: Vec<F>,
+        num_steps: usize,
+        field: LanguageField,
+        rc: usize,
+        lang: Lang<F, Coproc<F>>,
     },
+}
+
+/// Carries extra information to help with visualization, experiments etc
+#[derive(Serialize, Deserialize)]
+pub struct LurkProofMeta<F: LurkField> {
+    pub field: LanguageField,
+    pub iterations: usize,
+    pub evaluation_cost: u128,
+    pub generation_cost: u128,
+    pub compression_cost: u128,
+    pub status: Status,
+    pub expression: ZExprPtr<F>,
+    pub environment: ZExprPtr<F>,
+    pub result: ZExprPtr<F>,
+    pub zstore: ZStore<F>,
 }
 
 impl<'a> LurkProof<'a> {
@@ -69,19 +57,23 @@ impl<'a> LurkProof<'a> {
         use std::{fs::File, io::BufReader, sync::Arc};
 
         let file = File::open(proof_path(proof_id))?;
-        let reader = BufReader::new(file);
-        let lurk_proof: LurkProof = bincode::deserialize_from(reader)?;
+        let lurk_proof: LurkProof = bincode::deserialize_from(BufReader::new(file))?;
         match lurk_proof {
-            LurkProof::Nova {
-                nova_proof,
-                proof_info,
+            Self::Nova {
+                proof,
+                public_inputs,
+                public_outputs,
+                num_steps,
+                field,
+                rc,
+                lang,
             } => {
-                Backend::Nova.validate_field(&proof_info.field)?;
+                Backend::Nova.validate_field(&field)?;
 
                 info!("Loading public parameters");
-                let pp = public_params(proof_info.rc, Arc::new(proof_info.lang))?;
+                let pp = public_params(rc, Arc::new(lang))?;
 
-                if nova_proof.verify(&pp)? {
+                if proof.verify(&pp, num_steps, &public_inputs, &public_outputs)? {
                     println!("✓ Proof {proof_id} verified");
                 } else {
                     println!("✗ Proof {proof_id} failed on verification");

@@ -37,7 +37,12 @@ pub fn create_lurk_dirs() -> Result<()> {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn proof_path(name: &str) -> PathBuf {
-    proofs_dir().join(Path::new(name))
+    proofs_dir().join(Path::new(name)).with_extension("proof")
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn proof_meta_path(name: &str) -> PathBuf {
+    proofs_dir().join(Path::new(name)).with_extension("meta")
 }
 
 #[cfg(not(target_arch = "wasm32"))]
