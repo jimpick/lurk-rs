@@ -14,6 +14,7 @@ jobs:
   docs:
     name: Generate crate documentation
     runs-on: ubuntu-latest
+    if: ${{ !github.event.act || github.event.docs }}
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3

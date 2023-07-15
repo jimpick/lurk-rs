@@ -14,6 +14,7 @@ permissions:
 jobs:
   linkChecker:
     runs-on: ubuntu-latest
+    if: ${{ !github.event.act || github.event.link_checker }}
     steps:
       - uses: actions/checkout@v3
       - name: Link Checker

@@ -12,6 +12,7 @@ env:
 jobs:
   check_branches:
     runs-on: ubuntu-latest
+    if: ${{ !github.event.act || github.event.check_branches }}
 
     steps:
     - uses: actions/checkout@v3

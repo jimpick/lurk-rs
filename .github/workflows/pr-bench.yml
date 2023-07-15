@@ -14,12 +14,13 @@ jobs:
   runBenchmark:
     name: run benchmark
     runs-on: [self-hosted, bench]
-    if:
-      github.event.issue.pull_request
+    if: 
+      ${{ !github.event.act
+      && github.event.issue.pull_request
       && github.event.issue.state == 'open'
       && contains(github.event.comment.body, '!benchmark')
       && (github.event.comment.author_association == 'MEMBER'
-      || github.event.comment.author_association == 'OWNER')
+      || github.event.comment.author_association == 'OWNER') }}
     steps:
       - uses: xt0rted/pull-request-comment-branch@v2
         id: comment-branch

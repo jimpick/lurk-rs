@@ -1,0 +1,5 @@
+{
+    "act": true,
+    "build_native": false,
+    "wasm": true
+}

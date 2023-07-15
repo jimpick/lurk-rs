@@ -14,6 +14,7 @@ jobs:
   cargo-deny:
     name: cargo-deny (advisories, licenses, bans, ...)
     runs-on: ubuntu-latest
+    if: ${{ !github.event.act || github.event.cargo_deny }}
     steps:
       - uses: actions/checkout@v3
       - uses: EmbarkStudios/cargo-deny-action@v1

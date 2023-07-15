@@ -33,6 +33,7 @@ concurrency:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    if: ${{ !github.event.act || github.event.rust_test }}
     strategy:
       matrix:
         os:
@@ -59,6 +60,7 @@ jobs:
 
   msrv:
     runs-on: ubuntu-latest
+    if: ${{ !github.event.act || github.event.rust_msrv }}
     steps:
       - uses: actions/checkout@v3
       - name: Install rustup
@@ -75,6 +77,7 @@ jobs:
   test-gpu:
     name: Rust tests on CUDA
     runs-on: [self-hosted, gpu]
+    if: ${{ !github.event.act || github.event.rust_test_gpu }}
     env:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITITES: compute,utility
@@ -116,6 +119,7 @@ jobs:
 
   rustfmt_n_clippy:
     runs-on: ubuntu-latest
+    if: ${{ !github.event.act || github.event.rust_rustfmt_n_clippy }}
     steps:
       - uses: actions/checkout@v3
         with:
