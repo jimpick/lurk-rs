@@ -15,6 +15,8 @@ use lurk::{
     z_store::ZStore,
 };
 
+use crate::cli::repl::validate_non_zero;
+
 use self::repl::{Backend, Repl};
 
 const DEFAULT_LIMIT: usize = 100_000_000;
@@ -261,7 +263,7 @@ macro_rules! new_repl {
     ( $cli: expr, $limit: expr, $rc: expr, $field: path, $backend: expr ) => {{
         let mut store = get_store(&$cli.zstore).with_context(|| "reading store from file")?;
         let env = store.nil();
-        Repl::<$field>::new(store, env, $limit, $rc, $backend)?
+        Repl::<$field>::new(store, env, $limit, $rc, $backend)
     }};
 }
 
@@ -293,6 +295,9 @@ impl ReplCli {
             parse_field,
             backend.default_field(),
         )?;
+        validate_non_zero("limit", limit)?;
+        validate_non_zero("rc", rc)?;
+        backend.validate_field(&field)?;
         match field {
             LanguageField::Pallas => repl!(limit, rc, pallas::Scalar, backend),
             // LanguageField::Vesta => repl!(limit, rc, vesta::Scalar, backend),
@@ -333,6 +338,9 @@ impl LoadCli {
             parse_field,
             backend.default_field(),
         )?;
+        validate_non_zero("limit", limit)?;
+        validate_non_zero("rc", rc)?;
+        backend.validate_field(&field)?;
         match field {
             LanguageField::Pallas => load!(limit, rc, pallas::Scalar, backend),
             // LanguageField::Vesta => load!(limit, rc, vesta::Scalar, backend),

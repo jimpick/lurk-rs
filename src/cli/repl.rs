@@ -30,7 +30,20 @@ use lurk::{
 };
 
 #[cfg(not(target_arch = "wasm32"))]
-use super::lurk_proof::LurkProof;
+use lurk::{
+    proof::{nova::NovaProver, Prover},
+    public_parameters::public_params,
+    z_store::ZStore,
+};
+
+#[cfg(not(target_arch = "wasm32"))]
+use std::{fs::File, io::BufWriter};
+
+#[cfg(not(target_arch = "wasm32"))]
+use super::{
+    lurk_proof::{LurkProof, LurkProofMeta},
+    paths::{proof_meta_path, proof_path},
+};
 
 #[derive(Completer, Helper, Highlighter, Hinter)]
 struct InputValidator {
@@ -106,7 +119,7 @@ pub struct Repl<F: LurkField> {
     evaluation: Option<Evaluation<F>>,
 }
 
-fn validate_non_zero(name: &str, x: usize) -> Result<()> {
+pub fn validate_non_zero(name: &str, x: usize) -> Result<()> {
     if x == 0 {
         bail!("`{name}` can't be zero")
     }
@@ -116,17 +129,13 @@ fn validate_non_zero(name: &str, x: usize) -> Result<()> {
 /// `pad(a, m)` returns the first multiple of `m` that's equal or greater than `a`
 ///
 /// Panics if `m` is zero
-#[cfg(not(target_arch = "wasm32"))]
+#[inline]
+#[allow(dead_code)]
 fn pad(a: usize, m: usize) -> usize {
-    let lower = m * (a / m);
-    if lower < a {
-        lower + m
-    } else {
-        lower
-    }
+    (a + m - 1) / m * m
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 fn timestamp() -> u128 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
@@ -138,19 +147,12 @@ fn timestamp() -> u128 {
 type F = pasta_curves::pallas::Scalar; // TODO: generalize this
 
 impl Repl<F> {
-    pub fn new(
-        store: Store<F>,
-        env: Ptr<F>,
-        limit: usize,
-        rc: usize,
-        backend: Backend,
-    ) -> Result<Repl<F>> {
-        validate_non_zero("limit", limit)?;
-        validate_non_zero("rc", rc)?;
-        let field = F::FIELD;
-        backend.validate_field(&field)?;
-        info!("Launching REPL with backend {backend} and field {field}");
-        Ok(Repl {
+    pub fn new(store: Store<F>, env: Ptr<F>, limit: usize, rc: usize, backend: Backend) -> Repl<F> {
+        info!(
+            "Launching REPL with backend {backend} and field {}",
+            F::FIELD
+        );
+        Repl {
             store,
             env,
             limit,
@@ -158,21 +160,11 @@ impl Repl<F> {
             rc,
             backend,
             evaluation: None,
-        })
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn prove_last_frames(&mut self) -> Result<()> {
-        use super::{
-            lurk_proof::LurkProofMeta,
-            paths::{proof_meta_path, proof_path},
-        };
-        use lurk::{
-            proof::{nova::NovaProver, Prover},
-            public_parameters::public_params,
-            z_store::ZStore,
-        };
-        use std::{fs::File, io::BufWriter};
         match &self.evaluation {
             None => bail!("No computation to prove"),
             Some(Evaluation { frames, cost }) => match self.backend {
@@ -181,9 +173,10 @@ impl Repl<F> {
                     let mut frames = frames.clone(); // don't mutate memoized frames
                     let n_frames = frames.len();
                     let iterations = n_frames - 1; // needs to be fixed for incomplete computations
-                    for _ in 0..pad(n_frames, self.rc) - n_frames {
-                        frames.push(frames[frames.len() - 1].clone())
-                    }
+                    frames.extend(vec![
+                        frames.last().cloned().expect("frames is empty!");
+                        pad(n_frames, self.rc) - n_frames
+                    ]);
                     let n_frames = frames.len();
 
                     let prover = NovaProver::new(self.rc, (*self.lang).clone());
